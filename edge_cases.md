@@ -68,3 +68,14 @@ This is a simple list of edge cases that can happen in the Telegram Darknet Moni
   If Ollama is shut down, closed, or not listening on port 11434, calls will fail.
   *Solution:* Backend catches requests connection errors immediately and runs the regex fallback threat extractor so you still get structured threat metrics.
 
+---
+
+### 🧪 Automated Test Verification and Proofs
+
+We have created unit tests inside the `backend/tests/` folder to prove that these edge cases are solved:
+1. **`test_llm_offline_fallback`**: Simulates the local LLM being offline by throwing a connection error and verifies that the system successfully falls back to regex parser rules.
+2. **`test_data_directory_recreation`**: Proves that if data folders are missing or deleted, writing messages automatically recreates them on the fly.
+3. **`test_scraper_resilience_on_error`**: Simulates a network drop during scraping and proves that the monitored channel state is reset to `"idle"` rather than getting locked.
+4. **`test_ledger_url_deduplication`**: Verifies that duplicate links are merged correctly and their mention count increments statefully.
+
+
