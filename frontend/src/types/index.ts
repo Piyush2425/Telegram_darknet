@@ -1,12 +1,22 @@
 export interface Channel {
   id: string;
   username: string;
+  raw_username?: string;
   title: string;
   description?: string;
   member_count: number;
   is_monitored: boolean;
   last_scraped_at?: string;
   category: string;
+  type?: string;
+  message_count?: number;
+  status?: string;
+  
+  // Scheduler parameters
+  is_auto_monitoring?: boolean;
+  monitoring_interval_value?: number;
+  monitoring_interval_unit?: string;
+  next_scrape_at?: string;
 }
 
 export interface Message {

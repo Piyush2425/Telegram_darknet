@@ -3,11 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DashboardPage } from './pages/DashboardPage';
-import { TelegramPage } from './pages/TelegramPage';
-import { ScrapingPage } from './pages/ScrapingPage';
-import { IntelligencePage } from './pages/IntelligencePage';
-import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ChannelDetailPage } from './pages/ChannelDetailPage';
 import { getScraperStatus } from './services/api';
 
 export function App() {
@@ -27,24 +24,31 @@ export function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-darkBg text-slate-100 flex flex-col font-sans">
-        <Navbar isScraping={isScraping} />
+      <Routes>
+        {/* Detail page renders standalone in a new tab */}
+        <Route path="/channel/:channelId" element={<ChannelDetailPage />} />
+        
+        {/* Main Application layouts */}
+        <Route
+          path="/*"
+          element={
+            <div className="min-h-screen bg-darkBg text-slate-100 flex flex-col font-sans">
+              <Navbar isScraping={isScraping} />
 
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar />
+              <div className="flex-1 flex overflow-hidden">
+                <Sidebar />
 
-          <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/telegram" element={<TelegramPage />} />
-              <Route path="/scraping" element={<ScrapingPage />} />
-              <Route path="/intelligence" element={<IntelligencePage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+                <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+                  <Routes>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                  </Routes>
+                </main>
+              </div>
+            </div>
+          }
+        />
+      </Routes>
     </Router>
   );
 }

@@ -6,7 +6,7 @@ export const SettingsPage: React.FC = () => {
   // Telegram API & Phone Credentials
   const [apiId, setApiId] = useState('35816761');
   const [apiHash, setApiHash] = useState('e8d176e13dee1feafd0ad58172e427ca');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('+917276538133');
 
   // Telegram User Auth States
   const [authStatus, setAuthStatus] = useState<{ is_authorized: boolean; user?: any; reason?: string }>({ is_authorized: false });
@@ -36,7 +36,7 @@ export const SettingsPage: React.FC = () => {
       const res = await getTelegramAuthStatus();
       setAuthStatus(res);
     } catch (e) {
-      console.error(e);
+      console.error("Auth status error:", e);
     }
   };
 
@@ -60,7 +60,7 @@ export const SettingsPage: React.FC = () => {
       } else if (res.status === 'already_authenticated') {
         const userObj = (res as any).user;
         setAuthSuccessMsg(`🎉 Already authenticated as @${userObj?.username || userObj?.id}!`);
-        checkTelegramAuth();
+        setAuthStatus({ is_authorized: true, user: userObj });
       } else {
         setAuthError(res.error || 'Failed to send OTP code.');
       }
@@ -89,9 +89,15 @@ export const SettingsPage: React.FC = () => {
         password2FA.trim() || undefined
       );
 
-      if (res.status === 'authenticated') {
-        setAuthSuccessMsg(`🎉 Successfully connected as Telegram User @${res.user?.username || res.user?.first_name || 'User'}!`);
-        checkTelegramAuth();
+      if (res.status === 'authenticated' && res.user) {
+        const authenticatedUser = res.user;
+        setAuthSuccessMsg(`🎉 Successfully connected as Telegram User @${authenticatedUser.username || authenticatedUser.first_name || 'User'}!`);
+        // Immediately update authStatus badge to Authorized!
+        setAuthStatus({
+          is_authorized: true,
+          user: authenticatedUser
+        });
+        setTimeout(checkTelegramAuth, 600);
         setStep('PHONE');
         setOtpCode('');
         setPassword2FA('');
@@ -157,9 +163,9 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {authStatus.is_authorized ? (
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4" />
-              Connected: @{authStatus.user?.username || authStatus.user?.first_name || authStatus.user?.phone}
+            <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-lg shadow-emerald-500/10">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              Connected: @{authStatus.user?.username || authStatus.user?.first_name || authStatus.user?.phone || 'User'}
             </span>
           ) : (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
@@ -177,9 +183,9 @@ export const SettingsPage: React.FC = () => {
         )}
 
         {authSuccessMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span>{authSuccessMsg}</span>
+            <span className="font-medium">{authSuccessMsg}</span>
           </div>
         )}
 

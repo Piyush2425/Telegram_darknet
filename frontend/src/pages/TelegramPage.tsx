@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Plus, Eye, MessageSquare, Radio, ShieldCheck } from 'lucide-react';
-import { getChannels, getMessages, toggleChannelMonitoring, addCustomChannel } from '../services/api';
+import { Search, Plus, Eye, MessageSquare, RefreshCw, ShieldCheck, Download } from 'lucide-react';
+import { getChannels, getMessages, toggleChannelMonitoring, addCustomChannel, syncTelegramChannels } from '../services/api';
 import { Channel, Message } from '../types';
 
 export const TelegramPage: React.FC = () => {
@@ -8,7 +8,9 @@ export const TelegramPage: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [search, setSearch] = useState('');
-  
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
   // Add Channel Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newUsername, setNewUsername] = useState('');
@@ -29,6 +31,28 @@ export const TelegramPage: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleSyncRealChannels = async () => {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const res = await syncTelegramChannels();
+      setChannels(res.channels);
+      if (res.channels.length > 0) {
+        setSelectedChannel(res.channels[0]);
+        const msgs = await getMessages({ channel_id: res.channels[0].id });
+        setMessages(msgs);
+      }
+      setSyncMsg(`✓ Imported ${res.imported_count} real channels/groups from your Telegram account!`);
+      setTimeout(() => setSyncMsg(''), 4000);
+    } catch (e) {
+      console.error(e);
+      setSyncMsg('⚠️ Sync failed. Please make sure your Telegram account is authorized in Settings.');
+      setTimeout(() => setSyncMsg(''), 4000);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -72,18 +96,36 @@ export const TelegramPage: React.FC = () => {
     <div className="h-[calc(100vh-6.5rem)] flex bg-telegramDark rounded-2xl overflow-hidden border border-darkBorder shadow-2xl relative">
       {/* Left Chat List (Telegram Style) */}
       <div className="w-80 bg-darkCard/90 border-r border-darkBorder flex flex-col shrink-0">
-        {/* Top Controls: Search & Add Channel */}
+        {/* Top Controls: Search, Sync & Add Channel */}
         <div className="p-3 border-b border-darkBorder space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Telegram Channels</span>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg border border-cyan-500/30 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Channel
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleSyncRealChannels}
+                disabled={syncing}
+                title="Sync channels from your real Telegram account"
+                className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded-lg border border-emerald-500/30 transition-all"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Account'}
+              </button>
+
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-1 rounded-lg border border-cyan-500/30 transition-all"
+              >
+                <Plus className="w-3 h-3" />
+                Add
+              </button>
+            </div>
           </div>
+
+          {syncMsg && (
+            <div className="text-[10px] font-medium text-emerald-400 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+              {syncMsg}
+            </div>
+          )}
 
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -111,11 +153,11 @@ export const TelegramPage: React.FC = () => {
             >
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-700 to-slate-800 flex items-center justify-center font-bold text-sm shrink-0 border border-white/10">
-                  {ch.username.substring(0, 2).toUpperCase()}
+                  {ch.title.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="overflow-hidden">
-                  <div className="text-xs font-semibold truncate">@{ch.username}</div>
-                  <div className="text-[10px] opacity-75 truncate">{ch.title}</div>
+                  <div className="text-xs font-semibold truncate">{ch.title}</div>
+                  <div className="text-[10px] opacity-75 truncate">@{ch.username}</div>
                 </div>
               </div>
 
@@ -133,7 +175,7 @@ export const TelegramPage: React.FC = () => {
           <div className="h-14 px-6 bg-darkCard/90 border-b border-darkBorder flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs border border-cyan-500/30">
-                @{selectedChannel.username.substring(0, 2).toUpperCase()}
+                {selectedChannel.title.substring(0, 2).toUpperCase()}
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">{selectedChannel.title}</h3>
@@ -165,7 +207,7 @@ export const TelegramPage: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-cyan-400">{msg.sender}</span>
-                  <span className="text-[10px] text-slate-500">• Telegram Post</span>
+                  <span className="text-[10px] text-slate-500">• Real Telegram Post</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                   msg.threat_level === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
@@ -193,8 +235,8 @@ export const TelegramPage: React.FC = () => {
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
               <MessageSquare className="w-12 h-12 opacity-30" />
-              <p className="text-sm font-medium">No messages collected for @{selectedChannel?.username} yet.</p>
-              <p className="text-xs text-slate-400">Click "Scrape Controller" in the sidebar to scrape live messages from your Telegram account.</p>
+              <p className="text-sm font-medium">No messages collected for {selectedChannel?.title} yet.</p>
+              <p className="text-xs text-slate-400">Go to "Scraper Controller" in the sidebar and click "Initiate Scrape Run" to fetch real messages from your Telegram account.</p>
             </div>
           )}
         </div>

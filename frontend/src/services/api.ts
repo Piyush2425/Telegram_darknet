@@ -13,6 +13,11 @@ export const getChannels = async (): Promise<Channel[]> => {
   return res.data;
 };
 
+export const syncTelegramChannels = async (): Promise<{ imported_count: number; channels: Channel[] }> => {
+  const res = await api.post('/channels/sync-telegram');
+  return res.data;
+};
+
 export const addCustomChannel = async (username: string, title?: string): Promise<Channel> => {
   const res = await api.post('/channels/add', { username, title });
   return res.data;
@@ -20,6 +25,30 @@ export const addCustomChannel = async (username: string, title?: string): Promis
 
 export const toggleChannelMonitoring = async (channelId: string): Promise<{ channel_id: string; is_monitored: boolean }> => {
   const res = await api.post(`/channels/${channelId}/toggle-monitoring`);
+  return res.data;
+};
+
+export const scheduleChannel = async (
+  channelId: string, 
+  isAutoMonitoring: boolean, 
+  intervalValue: number, 
+  intervalUnit: string
+): Promise<Channel> => {
+  const res = await api.post(`/channels/${channelId}/schedule`, {
+    is_auto_monitoring: isAutoMonitoring,
+    interval_value: intervalValue,
+    interval_unit: intervalUnit
+  });
+  return res.data;
+};
+
+export const deleteChannel = async (channelId: string): Promise<{ status: string }> => {
+  const res = await api.delete(`/channels/${channelId}`);
+  return res.data;
+};
+
+export const scrapeSingleChannel = async (channelId: string): Promise<{ status: string }> => {
+  const res = await api.post(`/channels/${channelId}/scrape`);
   return res.data;
 };
 
