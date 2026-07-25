@@ -2,9 +2,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env if present
-env_path = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load .env from backend/ directory first, then project root as fallback
+backend_env = Path(__file__).resolve().parent.parent / ".env"
+root_env = Path(__file__).resolve().parents[2] / ".env"
+
+if backend_env.exists():
+    load_dotenv(dotenv_path=backend_env)
+elif root_env.exists():
+    load_dotenv(dotenv_path=root_env)
 
 class Settings:
     PROJECT_NAME: str = "Telegram Darknet Monitor"
@@ -28,7 +33,7 @@ class Settings:
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     
-    # Storage Paths
+    # Storage Paths — BASE_DIR is the project root (darknet-monitor/)
     BASE_DIR: Path = Path(__file__).resolve().parents[2]
     REPORTS_DIR: Path = BASE_DIR / "Reports"
     DATA_DIR: Path = BASE_DIR / "data"

@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, BackgroundTasks
 from ..db.mongodb import store
 from ..scrapers.telegram_scraper import telegram_scraper
@@ -14,11 +15,11 @@ async def run_scraping_job():
 
     messages = await telegram_scraper.scrape_channels(monitored)
     
-    # Store messages & analyze with LLM Threat Analyzer
+    # Store messages & analyze with LLM Threat Analyzer in a thread pool
     threat_intels = []
     for msg in messages:
         store.messages[msg["id"]] = msg
-        intel = analyzer.analyze_message(msg)
+        intel = await asyncio.to_thread(analyzer.analyze_message, msg)
         store.threat_intel[intel["id"]] = intel
         threat_intels.append(intel)
 

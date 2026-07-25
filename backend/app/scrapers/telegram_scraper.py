@@ -1,9 +1,13 @@
 import os
+import csv
+import re
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from ..config import settings
+from ..db.mongodb import store
 
 logger = logging.getLogger("darknet_monitor.scraper")
 
@@ -11,40 +15,25 @@ logger = logging.getLogger("darknet_monitor.scraper")
 telethon_available = False
 try:
     from telethon import TelegramClient
+    from telethon.tl.types import Channel as TelethonChannel, Chat as TelethonChat, User as TelethonUser
     from telethon.errors import SessionPasswordNeededError, RPCError, ApiIdInvalidError, PhoneNumberInvalidError
     telethon_available = True
 except ImportError:
     telethon_available = False
 
-MOCK_MESSAGES_POOL = [
-    {
-        "text": "EXCLUSIVITY LEAK: Fresh database dump from major regional logistics provider. 450,000 user records, hashed passwords, SSNs and full address logs. Download link: http://breachlogs.onion/download?id=84920. BTC wallet for VIP access: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa. Contact @admin_darknet for pricing.",
-        "threat_level": "CRITICAL",
-        "views": 1420
-    },
-    {
-        "text": "CRITICAL ZERO-DAY DISCLOSURE: CVE-2026-11849 affecting Linux kernel eBPF subsystem allowing unprivileged local privilege escalation (LPE) to root. Exploit script POC available on git. IOC hashes: sha256 5f4dcc3b5aa765d61d8327deb882cf992b95990a1ce22255470d061718040a1b.",
-        "threat_level": "HIGH",
-        "views": 3290
-    },
-    {
-        "text": "Lumma Stealer v4.2 updated with bypass for Chrome 127 Application-Bound Encryption. Features cookie stealing, Telegram session hijacker, and MetaMask wallet grabber. C2 server: 194.165.16.82:8080. Contact LummaDev on Tox.",
-        "threat_level": "CRITICAL",
-        "views": 5120
-    }
-]
-
 class TelegramScraper:
-    """Telegram Scraper with Telethon OTP Login matching cli.py persistent authentication."""
+    """Telegram Scraper with first-time full scraping and incremental update checks."""
 
     def __init__(self):
         self.is_scraping = False
         self.progress = 0
         self.current_channel = ""
         self.logs: List[str] = []
+        self.client: Optional[Any] = None
         self.auth_client: Optional[Any] = None
         self.phone_code_hash: Optional[str] = None
         self.active_phone: Optional[str] = None
+        self._lock = asyncio.Lock()
 
     def log(self, message: str):
         timestamp = datetime.utcnow().strftime("%H:%M:%S")
@@ -53,6 +42,18 @@ class TelegramScraper:
         if len(self.logs) > 100:
             self.logs.pop(0)
         logger.info(log_entry)
+
+    def _cleanup_corrupted_session(self):
+        """Remove leftover/corrupted Telethon session files to reset MTProto auth key."""
+        session_base = settings.BASE_DIR / "darknet_session"
+        for ext in [".session", ".session-journal"]:
+            p = Path(str(session_base) + ext)
+            if p.exists():
+                try:
+                    p.unlink()
+                    self.log(f"Cleaned up session file: {p.name}")
+                except Exception as e:
+                    logger.warning(f"Could not remove session file {p}: {e}")
 
     def _create_telethon_client(self, api_id: int = 0, api_hash: str = ""):
         if not telethon_available:
@@ -66,216 +67,414 @@ class TelegramScraper:
         session_path = str(settings.BASE_DIR / "darknet_session")
         return TelegramClient(session_path, int(target_api_id), str(target_api_hash))
 
+    async def get_connected_client(self) -> Optional[Any]:
+        """Get or initialize the persistent connected TelegramClient to prevent SQLite lock errors."""
+        if self.client:
+            try:
+                if self.client.is_connected():
+                    return self.client
+                await self.client.connect()
+                return self.client
+            except Exception:
+                self.client = None
+
+        self.client = self._create_telethon_client()
+        if not self.client:
+            return None
+
+        try:
+            await self.client.connect()
+            return self.client
+        except Exception as e:
+            err_str = str(e)
+            if "auth_key" in err_str.lower() or "nonce" in err_str.lower() or "step 3" in err_str.lower():
+                self._cleanup_corrupted_session()
+            self.client = None
+            return None
+
+    def _safe_name(self, s: str) -> str:
+        s = re.sub(r"\W+", "_", (s or "").strip())
+        s = s.strip("_")
+        return s[:80] if s else "target"
+
+    def _get_latest_saved_msg_id(self, channel_title: str) -> int:
+        """Parse the channel's CSV file and return the maximum raw Telethon message ID stored."""
+        try:
+            safe_name = self._safe_name(channel_title)
+            csv_file = settings.BASE_DIR / "data" / "chats" / f"messages_{safe_name}.csv"
+            if not csv_file.exists():
+                return 0
+            
+            max_id = 0
+            with open(csv_file, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                if len(rows) > 1:
+                    for row in rows[1:]:
+                        if len(row) > 0:
+                            msg_id_str = row[0]  # e.g., "msg_-1003748220204_36873"
+                            parts = msg_id_str.split("_")
+                            if len(parts) >= 3:
+                                try:
+                                    raw_id = int(parts[-1])
+                                    if raw_id > max_id:
+                                        max_id = raw_id
+                                except ValueError:
+                                    pass
+            return max_id
+        except Exception as e:
+            logger.error(f"Error reading latest saved message ID: {e}")
+            return 0
+
+    def _write_messages_to_csv(self, channel_title: str, messages: List[Dict[str, Any]]):
+        """Store scraped data in CSV channel-wise in backend data/chats/ folder (de-duplicated)."""
+        try:
+            chats_dir = settings.BASE_DIR / "data" / "chats"
+            chats_dir.mkdir(parents=True, exist_ok=True)
+            
+            safe_name = self._safe_name(channel_title)
+            csv_file = chats_dir / f"messages_{safe_name}.csv"
+            
+            existing_ids = set()
+            file_exists = csv_file.exists()
+            if file_exists:
+                with open(csv_file, "r", newline="", encoding="utf-8") as rf:
+                    reader = csv.reader(rf)
+                    rows = list(reader)
+                    if len(rows) > 0:
+                        for row in rows[1:]:  # Skip header row
+                            if len(row) > 0:
+                                existing_ids.add(row[0])
+            
+            # De-duplicate: only keep messages not already stored in the CSV
+            new_messages = [m for m in messages if m.get("id") not in existing_ids]
+            if not new_messages:
+                return
+            
+            # Sort chronologically so they append in ascending order
+            new_messages.sort(key=lambda x: x.get("id"))
+
+            with open(csv_file, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(["message_id", "date", "sender", "text", "views", "threat_level"])
+                
+                for msg in new_messages:
+                    writer.writerow([
+                        msg.get("id"),
+                        msg.get("date"),
+                        msg.get("sender"),
+                        msg.get("text", "").replace("\n", " "),
+                        msg.get("views", 0),
+                        msg.get("threat_level", "LOW")
+                    ])
+            self.log(f"✓ Appended {len(new_messages)} new unique messages to CSV: data/chats/messages_{safe_name}.csv")
+        except Exception as e:
+            logger.error(f"Error saving messages to CSV: {e}")
+
     async def check_auth_status(self) -> Dict[str, Any]:
         """Check if Telethon user session is active and authorized."""
         if not telethon_available:
             return {"is_authorized": False, "reason": "Telethon library missing"}
 
-        client = self._create_telethon_client()
-        if not client:
-            return {"is_authorized": False, "reason": "API ID and API Hash not set in .env"}
+        async with self._lock:
+            client = await self.get_connected_client()
+            if not client:
+                return {"is_authorized": False, "reason": "API ID and API Hash not set in .env"}
 
-        try:
-            await client.connect()
-            is_auth = await client.is_user_authorized()
-            user_info = None
-            if is_auth:
-                me = await client.get_me()
-                user_info = {
-                    "id": me.id,
-                    "username": me.username,
-                    "first_name": me.first_name,
-                    "phone": me.phone
+            try:
+                is_auth = await client.is_user_authorized()
+                user_info = None
+                if is_auth:
+                    me = await client.get_me()
+                    user_info = {
+                        "id": me.id,
+                        "username": me.username,
+                        "first_name": me.first_name,
+                        "phone": me.phone
+                    }
+                return {
+                    "is_authorized": is_auth,
+                    "user": user_info,
+                    "api_id": settings.TELEGRAM_API_ID
                 }
-            await client.disconnect()
-            return {
-                "is_authorized": is_auth,
-                "user": user_info,
-                "api_id": settings.TELEGRAM_API_ID
-            }
-        except Exception as e:
-            return {"is_authorized": False, "reason": str(e)}
+            except Exception as e:
+                return {"is_authorized": False, "reason": str(e)}
 
     async def send_otp_code(self, phone_number: str, api_id: int = 0, api_hash: str = "") -> Dict[str, Any]:
         """Send Telegram OTP code to phone number, maintaining active Telethon client."""
         clean_phone = phone_number.strip().replace(" ", "")
-        
-        # Initialize persistent auth client
-        self.auth_client = self._create_telethon_client(api_id, api_hash)
-        if not self.auth_client:
-            return {"error": "Invalid API ID or API Hash. Please verify your credentials in Settings or .env"}
 
-        try:
-            await self.auth_client.connect()
-            if await self.auth_client.is_user_authorized():
-                me = await self.auth_client.get_me()
-                await self.auth_client.disconnect()
-                self.auth_client = None
-                return {
-                    "status": "already_authenticated",
-                    "user": {"id": me.id, "username": me.username, "phone": me.phone}
-                }
-
-            res = await self.auth_client.send_code_request(clean_phone)
-            self.phone_code_hash = res.phone_code_hash
-            self.active_phone = clean_phone
-
-            self.log(f"Successfully requested OTP code for {clean_phone}")
-            return {
-                "status": "code_sent",
-                "phone_number": clean_phone,
-                "phone_code_hash": res.phone_code_hash
-            }
-        except ApiIdInvalidError:
-            if self.auth_client:
-                await self.auth_client.disconnect()
-                self.auth_client = None
-            return {"error": "The API ID / API Hash provided is invalid. Please check your credentials from my.telegram.org."}
-        except PhoneNumberInvalidError:
-            if self.auth_client:
-                await self.auth_client.disconnect()
-                self.auth_client = None
-            return {"error": "Invalid phone number format. Please enter in full international format (e.g., +919876543210)."}
-        except Exception as e:
-            if self.auth_client:
+        async with self._lock:
+            if self.client:
                 try:
-                    await self.auth_client.disconnect()
+                    await self.client.disconnect()
                 except Exception:
                     pass
-                self.auth_client = None
-            self.log(f"Error sending OTP to {clean_phone}: {e}")
-            return {"error": str(e)}
+                self.client = None
+
+            self.auth_client = self._create_telethon_client(api_id, api_hash)
+            if not self.auth_client:
+                return {"error": "Invalid API ID or API Hash. Please verify your credentials in Settings or .env"}
+
+            try:
+                try:
+                    await self.auth_client.connect()
+                except Exception as conn_err:
+                    if "auth_key" in str(conn_err).lower() or "nonce" in str(conn_err).lower():
+                        self.log("Detected corrupted session key. Resetting session file...")
+                        self._cleanup_corrupted_session()
+                        self.auth_client = self._create_telethon_client(api_id, api_hash)
+                        await self.auth_client.connect()
+                    else:
+                        raise conn_err
+
+                if await self.auth_client.is_user_authorized():
+                    me = await self.auth_client.get_me()
+                    await self.auth_client.disconnect()
+                    self.auth_client = None
+                    return {
+                        "status": "already_authenticated",
+                        "user": {"id": me.id, "username": me.username, "phone": me.phone}
+                    }
+
+                res = await self.auth_client.send_code_request(clean_phone)
+                self.phone_code_hash = res.phone_code_hash
+                self.active_phone = clean_phone
+
+                self.log(f"Successfully requested OTP code for {clean_phone}")
+                return {
+                    "status": "code_sent",
+                    "phone_number": clean_phone,
+                    "phone_code_hash": res.phone_code_hash
+                }
+            except ApiIdInvalidError:
+                if self.auth_client:
+                    await self.auth_client.disconnect()
+                    self.auth_client = None
+                return {"error": "The API ID / API Hash provided is invalid. Please check your credentials from my.telegram.org."}
+            except PhoneNumberInvalidError:
+                if self.auth_client:
+                    await self.auth_client.disconnect()
+                    self.auth_client = None
+                return {"error": "Invalid phone number format. Please enter in full international format (e.g., +919876543210)."}
+            except Exception as e:
+                if self.auth_client:
+                    try:
+                        await self.auth_client.disconnect()
+                    except Exception:
+                        pass
+                    self.auth_client = None
+                err_msg = str(e)
+                if "auth_key" in err_msg.lower() or "nonce" in err_msg.lower():
+                    self._cleanup_corrupted_session()
+                    return {"error": "Session handshake retry requested. Please click 'Send OTP Code' again."}
+                self.log(f"Error sending OTP to {clean_phone}: {e}")
+                return {"error": err_msg}
 
     async def verify_otp_code(self, phone_number: str, code: str, phone_code_hash: Optional[str] = None, password: Optional[str] = None) -> Dict[str, Any]:
         """Verify OTP code and complete Telethon sign-in."""
         clean_phone = phone_number.strip().replace(" ", "")
         code_str = code.strip()
 
-        # Use existing connected auth_client or reconnect
-        if not self.auth_client:
-            self.auth_client = self._create_telethon_client()
+        async with self._lock:
             if not self.auth_client:
-                return {"error": "Telethon client unavailable."}
-            await self.auth_client.connect()
+                self.auth_client = self._create_telethon_client()
+                if not self.auth_client:
+                    return {"error": "Telethon client unavailable."}
+                await self.auth_client.connect()
 
-        hash_to_use = phone_code_hash or self.phone_code_hash
+            hash_to_use = phone_code_hash or self.phone_code_hash
 
-        try:
             try:
-                user = await self.auth_client.sign_in(phone=clean_phone, code=code_str, phone_code_hash=hash_to_use)
-            except SessionPasswordNeededError:
-                if not password:
-                    return {"error": "2FA_PASSWORD_REQUIRED", "message": "Two-Factor Authentication (2FA) password required"}
-                user = await self.auth_client.sign_in(password=password)
+                try:
+                    user = await self.auth_client.sign_in(phone=clean_phone, code=code_str, phone_code_hash=hash_to_use)
+                except SessionPasswordNeededError:
+                    if not password:
+                        return {"error": "2FA_PASSWORD_REQUIRED", "message": "Two-Factor Authentication (2FA) password required"}
+                    user = await self.auth_client.sign_in(password=password)
 
-            me = await self.auth_client.get_me()
-            await self.auth_client.disconnect()
-            self.auth_client = None
+                me = await self.auth_client.get_me()
+                await self.auth_client.disconnect()
+                self.auth_client = None
 
-            self.log(f"🎉 Successfully authenticated Telegram session for @{me.username or me.id}!")
-            return {
-                "status": "authenticated",
-                "user": {
-                    "id": me.id,
-                    "username": me.username,
-                    "first_name": me.first_name,
-                    "phone": me.phone
+                self.log(f"🎉 Successfully authenticated Telegram session for @{me.username or me.id}!")
+                
+                # Auto-sync dialogs
+                asyncio.create_task(self.sync_user_dialogs())
+
+                return {
+                    "status": "authenticated",
+                    "user": {
+                        "id": me.id,
+                        "username": me.username,
+                        "first_name": me.first_name,
+                        "phone": me.phone
+                    }
                 }
-            }
-        except Exception as e:
-            self.log(f"Error verifying OTP code: {e}")
-            return {"error": str(e)}
+            except Exception as e:
+                self.log(f"Error verifying OTP code: {e}")
+                return {"error": str(e)}
+
+    async def sync_user_dialogs(self) -> List[Dict[str, Any]]:
+        """Fetch ALL real Telegram channels & groups from the authenticated user's account."""
+        self.log("Syncing real channels and groups from your Telegram account...")
+        
+        async with self._lock:
+            client = await self.get_connected_client()
+            if not client:
+                self.log("Cannot sync channels: Telethon client configuration missing.")
+                return []
+
+            imported_channels = []
+            try:
+                if not await client.is_user_authorized():
+                    self.log("User not authorized yet. Please complete OTP login first.")
+                    return []
+
+                real_count = 0
+                async for dialog in client.iter_dialogs(limit=500):
+                    entity = dialog.entity
+                    
+                    if isinstance(entity, TelethonUser) and not getattr(entity, 'bot', False):
+                        continue
+
+                    raw_username = getattr(entity, 'username', '') or ""
+                    username_display = f"@{raw_username}" if raw_username else "Private Group/Channel"
+                    title = dialog.name or getattr(entity, 'title', None) or f"Telegram_{dialog.id}"
+                    
+                    if getattr(entity, 'megagroup', False):
+                        ch_type = "Supergroup"
+                    elif getattr(dialog, 'is_channel', False) or isinstance(entity, TelethonChannel):
+                        ch_type = "Channel"
+                    else:
+                        ch_type = "Group"
+
+                    member_count = getattr(entity, 'participants_count', 0) or getattr(entity, 'members_count', 0) or 0
+                    ch_id = str(dialog.id)
+                    existing_msgs = [m for m in store.messages.values() if m.get("channel_id") == ch_id]
+
+                    ch_data = {
+                        "id": ch_id,
+                        "username": username_display,
+                        "raw_username": raw_username,
+                        "title": title,
+                        "description": f"Real Telegram {ch_type} ({title})",
+                        "member_count": member_count,
+                        "is_monitored": True,
+                        "last_scraped_at": None,
+                        "category": ch_type,
+                        "type": ch_type,
+                        "message_count": len(existing_msgs),
+                        "status": "idle"
+                    }
+                    store.channels[ch_id] = ch_data
+                    imported_channels.append(ch_data)
+                    real_count += 1
+
+                self.log(f"✓ Successfully imported {real_count} REAL channels/groups from your Telegram account!")
+                return imported_channels
+            except Exception as e:
+                self.log(f"Error syncing Telegram dialogs: {e}")
+                return []
 
     async def scrape_channels(self, channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Fetch real Telegram messages via Telethon or fallback to demo telemetry."""
+        """Fetch REAL Telegram messages. Full scrape on first run; incremental updates thereafter."""
         self.is_scraping = True
         self.progress = 0
         self.logs.clear()
         self.log(f"Initiating Telegram data collection across {len(channels)} channels...")
 
-        client = self._create_telethon_client()
         all_scraped_messages = []
-        total_channels = len(channels)
+        try:
+            async with self._lock:
+                client = await self.get_connected_client()
+                total_channels = len(channels)
 
-        if client:
-            try:
-                await client.connect()
-            except Exception as e:
-                self.log(f"Telethon client connection failed: {e}")
-                client = None
+                is_user_auth = False
+                if client:
+                    try:
+                        is_user_auth = await client.is_user_authorized()
+                    except Exception as e:
+                        self.log(f"Verification of user authorization failed: {e}")
 
-        for idx, channel in enumerate(channels):
-            username = channel.get("username", "").replace("@", "").strip()
-            self.current_channel = username
-            self.log(f"Connecting to Telegram API... Fetching live posts from @{username}")
+                for idx, channel in enumerate(channels):
+                    ch_id = channel.get("id")
+                    raw_user = channel.get("raw_username", "")
+                    target_entity = raw_user if raw_user else int(ch_id) if str(ch_id).lstrip("-").isdigit() else ch_id
 
-            scraped_from_channel = []
+                    self.current_channel = channel.get("title", str(target_entity))
+                    store.channels[ch_id]["status"] = "scraping"
 
-            if client and await client.is_user_authorized():
-                try:
-                    # Fetch REAL live messages using Telethon
-                    entity = await client.get_entity(username)
-                    async for message in client.iter_messages(entity, limit=30):
-                        if not message.text:
-                            continue
-                        
-                        msg_date = message.date if message.date else datetime.utcnow()
-                        msg_data = {
-                            "id": f"msg_{channel['id']}_{message.id}",
-                            "channel_id": channel["id"],
-                            "channel_username": username,
-                            "sender": str(message.sender_id or f"User_{username}"),
-                            "text": message.text,
-                            "date": msg_date.isoformat(),
-                            "views": getattr(message, "views", 100) or 100,
-                            "media_url": None,
-                            "threat_level": "LOW",
-                            "analyzed": False
-                        }
-                        scraped_from_channel.append(msg_data)
+                    # Check for incremental scraping stage
+                    latest_raw_id = self._get_latest_saved_msg_id(self.current_channel)
+                    
+                    if latest_raw_id > 0:
+                        self.log(f"🔄 Incremental scrape active for '{self.current_channel}'. Only fetching posts newer than message ID {latest_raw_id}...")
+                    else:
+                        self.log(f"🚀 First-time scrape active for '{self.current_channel}'. Crawling full conversational history...")
 
-                    self.log(f"✓ REAL Telegram API: Scraped {len(scraped_from_channel)} live posts from @{username}")
-                except Exception as e:
-                    self.log(f"Real Telethon fetch for @{username} encountered error: {e}. Generating demo telemetry.")
-                    scraped_from_channel = self._generate_mock_messages(channel)
-            else:
-                # Demo telemetry fallback
-                await asyncio.sleep(0.8)
-                scraped_from_channel = self._generate_mock_messages(channel)
-                self.log(f"Demo Mode: Generated {len(scraped_from_channel)} telemetry posts for @{username}")
+                    scraped_from_channel = []
 
-            all_scraped_messages.extend(scraped_from_channel)
-            self.progress = int(((idx + 1) / total_channels) * 100)
+                    if client and is_user_auth:
+                        try:
+                            try:
+                                entity = await client.get_entity(target_entity)
+                            except Exception:
+                                entity = target_entity
 
-        if client:
-            try:
-                await client.disconnect()
-            except Exception:
-                pass
+                            # If latest_raw_id exists, fetch only newer posts using min_id
+                            # If first run, scrape full history (capped at 50,000 to prevent flood blocks)
+                            limit_val = 1500 if latest_raw_id > 0 else 50000
 
-        self.log(f"Scraping completed! Total {len(all_scraped_messages)} messages collected.")
-        self.is_scraping = False
+                            kwargs = {"limit": limit_val}
+                            if latest_raw_id > 0:
+                                kwargs["min_id"] = latest_raw_id
+
+                            async for message in client.iter_messages(entity, **kwargs):
+
+                                if not message.text:
+                                    continue
+                                
+                                msg_date = message.date
+                                msg_data = {
+                                    "id": f"msg_{ch_id}_{message.id}",
+                                    "channel_id": str(ch_id),
+                                    "channel_username": channel.get("title") or channel.get("username"),
+                                    "sender": str(message.sender_id or f"User_{ch_id}"),
+                                    "text": message.text,
+                                    "date": msg_date.isoformat() if msg_date else datetime.utcnow().isoformat(),
+                                    "views": getattr(message, "views", 10) or 10,
+                                    "media_url": None,
+                                    "threat_level": "LOW",
+                                    "analyzed": False
+                                }
+                                scraped_from_channel.append(msg_data)
+
+                            self.log(f"✓ Extracted {len(scraped_from_channel)} new posts from '{self.current_channel}'")
+                            
+                            # Store channel-wise CSV in backend (de-duplicated)
+                            if scraped_from_channel:
+                                self._write_messages_to_csv(self.current_channel, scraped_from_channel)
+
+                        except Exception as e:
+                            self.log(f"Telethon live fetch for '{self.current_channel}' error: {e}")
+                    else:
+                        self.log(f"User account not authorized. Complete Telegram OTP verification in Settings to pull live data.")
+
+                    store.channels[ch_id]["status"] = "idle"
+                    store.channels[ch_id]["message_count"] = len([m for m in store.messages.values() if m.get("channel_id") == str(ch_id)]) + len(scraped_from_channel)
+
+                    all_scraped_messages.extend(scraped_from_channel)
+                    self.progress = int(((idx + 1) / total_channels) * 100)
+        finally:
+            # Guarantee cleanup of status flags
+            for ch in store.channels.values():
+                ch["status"] = "idle"
+            self.progress = 100
+            self.is_scraping = False
+
+        self.log(f"Telegram Scraping completed! Total {len(all_scraped_messages)} new messages collected.")
         return all_scraped_messages
-
-    def _generate_mock_messages(self, channel: Dict[str, Any]) -> List[Dict[str, Any]]:
-        import random
-        num_messages = random.randint(3, 5)
-        msgs = []
-        for m_idx in range(num_messages):
-            sample = random.choice(MOCK_MESSAGES_POOL)
-            msg_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 120))
-            msgs.append({
-                "id": f"msg_{channel['id']}_{m_idx}_{int(msg_time.timestamp())}",
-                "channel_id": channel["id"],
-                "channel_username": channel.get("username", "Unknown"),
-                "sender": f"User_{random.randint(1000, 9999)}",
-                "text": sample["text"],
-                "date": msg_time.isoformat(),
-                "views": sample["views"] + random.randint(10, 500),
-                "media_url": None,
-                "threat_level": sample["threat_level"],
-                "analyzed": False
-            })
-        return msgs
 
 telegram_scraper = TelegramScraper()

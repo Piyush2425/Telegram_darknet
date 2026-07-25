@@ -5,12 +5,22 @@ from datetime import datetime
 class Channel(BaseModel):
     id: str
     username: str
+    raw_username: Optional[str] = ""
     title: str
     description: Optional[str] = ""
     member_count: int = 0
     is_monitored: bool = False
     last_scraped_at: Optional[datetime] = None
     category: str = "General Threat"
+    type: Optional[str] = "Channel"
+    message_count: Optional[int] = 0
+    status: Optional[str] = "idle"
+    
+    # Scheduler details
+    is_auto_monitoring: bool = False
+    monitoring_interval_value: int = 60  # Default 60 mins
+    monitoring_interval_unit: str = "minutes"  # "minutes" or "hours"
+    next_scrape_at: Optional[datetime] = None
 
 class Message(BaseModel):
     id: str
