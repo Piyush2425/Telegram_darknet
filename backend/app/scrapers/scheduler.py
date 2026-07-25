@@ -440,7 +440,7 @@ async def generate_auto_report_task(channel_id: str):
             "summary": f"Final daily threat intelligence briefing PDF compiled for '{ch['title']}'."
         }
         
-        telegram_scraper.log(f"✓ Final Daily PDF Report compiled successfully: Reports/pdf/{pdf_path.name}")
+        telegram_scraper.log(f"✓ Final Daily PDF Report compiled successfully: data/{channel_id}/reports/{pdf_path.name}")
     except Exception as e:
         logger.error(f"Error compiling daily PDF report: {e}")
         telegram_scraper.log(f"⚠ PDF Report compilation failed: {e}")

@@ -35,8 +35,8 @@ class Settings:
     
     # Storage Paths — BASE_DIR is the project root (darknet-monitor/)
     BASE_DIR: Path = Path(__file__).resolve().parents[2]
-    REPORTS_DIR: Path = BASE_DIR / "Reports"
     DATA_DIR: Path = BASE_DIR / "data"
+    REPORTS_DIR: Path = DATA_DIR / "reports"
 
 settings = Settings()
 
