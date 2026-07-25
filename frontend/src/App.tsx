@@ -1,72 +1,52 @@
-import { Suspense, lazy, useMemo } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AppShell } from '@/layouts/AppShell';
-import { useAsyncQuery } from '@/hooks/useAsyncQuery';
-import { fetchDashboard, fetchStatus } from '@/services/api';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Navbar } from './components/layout/Navbar';
+import { Sidebar } from './components/layout/Sidebar';
+import { DashboardPage } from './pages/DashboardPage';
+import { TelegramPage } from './pages/TelegramPage';
+import { ScrapingPage } from './pages/ScrapingPage';
+import { IntelligencePage } from './pages/IntelligencePage';
+import { ReportsPage } from './pages/ReportsPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { getScraperStatus } from './services/api';
 
-const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })));
-const MessagesPage = lazy(() => import('@/pages/messages/MessagesPage').then((module) => ({ default: module.MessagesPage })));
-const CredentialsPage = lazy(() => import('@/pages/credentials/CredentialsPage').then((module) => ({ default: module.CredentialsPage })));
-const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })));
-const MonitoringPage = lazy(() => import('@/pages/monitoring/MonitoringPage').then((module) => ({ default: module.MonitoringPage })));
-const TelegramExplorerPage = lazy(() => import('@/pages/telegram-explorer/TelegramExplorerPage').then((module) => ({ default: module.TelegramExplorerPage })));
-const LogsPage = lazy(() => import('@/pages/logs/LogsPage').then((module) => ({ default: module.LogsPage })));
-const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
-const SchedulerPage = lazy(() => import('@/pages/scheduler/SchedulerPage').then((module) => ({ default: module.SchedulerPage })));
-const ScraperPage = lazy(() => import('@/pages/scraper/ScraperPage').then((module) => ({ default: module.ScraperPage })));
-const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
-const ExportsPage = lazy(() => import('@/pages/exports/ExportsPage').then((module) => ({ default: module.ExportsPage })));
+export function App() {
+  const [isScraping, setIsScraping] = useState(false);
 
-export default function App() {
-  const routeShell = useMemo(
-    () => (
-      <div className="flex min-h-[40vh] items-center justify-center rounded-[24px] border border-white/10 bg-white/5">
-        <div className="flex items-center gap-3 text-sm text-slate-300">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
-          Loading page
-        </div>
-      </div>
-    ),
-    [],
-  );
-
-  const shellDashboard = useAsyncQuery(fetchDashboard, { refreshIntervalMs: 30000 });
-  const shellStatus = useAsyncQuery(fetchStatus, { refreshIntervalMs: 30000 });
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const st = await getScraperStatus();
+        setIsScraping(st.is_scraping);
+      } catch (e) {
+        // quiet fallback
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <BrowserRouter>
-      <Suspense fallback={routeShell}>
-        <Routes>
-            <Route
-              element={
-                <AppShell
-                telegramStatus={shellDashboard.data?.telegram_status ?? (shellStatus.data?.client_connected ? 'Connected' : 'Disconnected')}
-                mongodbStatus={shellDashboard.data?.mongodb_status ?? shellStatus.data?.mongodb_status ?? 'Unknown'}
-                currentUser="Operator"
-                onRefresh={() => {
-                  void shellDashboard.refetch();
-                  void shellStatus.refetch();
-                }}
-              />
-              }
-            >
-            <Route index element={<DashboardPage />} />
-            <Route path="monitoring" element={<MonitoringPage />} />
-            <Route path="monitoring/:telegramId" element={<MonitoringPage />} />
-            <Route path="messages" element={<MessagesPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="credentials" element={<CredentialsPage />} />
-            <Route path="explorer" element={<TelegramExplorerPage />} />
-            <Route path="logs" element={<LogsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="scheduler" element={<SchedulerPage />} />
-            <Route path="scraper" element={<ScraperPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="exports" element={<ExportsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <Router>
+      <div className="min-h-screen bg-darkBg text-slate-100 flex flex-col font-sans">
+        <Navbar isScraping={isScraping} />
+
+        <div className="flex-1 flex overflow-hidden">
+          <Sidebar />
+
+          <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/telegram" element={<TelegramPage />} />
+              <Route path="/scraping" element={<ScrapingPage />} />
+              <Route path="/intelligence" element={<IntelligencePage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
+    </Router>
   );
 }
+
+export default App;
