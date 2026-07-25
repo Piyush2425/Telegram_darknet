@@ -6,7 +6,6 @@ env/
 *.venv
 backend/.venv/
 backend/venv/
-
 # Node / JavaScript
 node_modules/
 frontend/node_modules/
@@ -51,3 +50,4 @@ Thumbs.db
 # Logs
 *.log
 logs/
+darknet_session.session

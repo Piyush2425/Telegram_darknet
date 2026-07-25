@@ -36,7 +36,8 @@ class TelegramScraper:
         self._lock = asyncio.Lock()
 
     def log(self, message: str):
-        timestamp = datetime.utcnow().strftime("%H:%M:%S")
+        ist = timezone(timedelta(hours=5, minutes=30))
+        timestamp = datetime.now(ist).strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}"
         self.logs.append(log_entry)
         if len(self.logs) > 100:
@@ -97,80 +98,95 @@ class TelegramScraper:
         s = s.strip("_")
         return s[:80] if s else "target"
 
-    def _get_latest_saved_msg_id(self, channel_title: str) -> int:
-        """Parse the channel's CSV file and return the maximum raw Telethon message ID stored."""
+    def _get_latest_saved_msg_id(self, channel_id: str) -> int:
+        """Parse all channel CSV files under data/{channel_id}/chats/ and return the maximum raw Telethon message ID stored."""
         try:
-            safe_name = self._safe_name(channel_title)
-            csv_file = settings.BASE_DIR / "data" / "chats" / f"messages_{safe_name}.csv"
-            if not csv_file.exists():
+            chats_dir = settings.DATA_DIR / channel_id / "chats"
+            if not chats_dir.exists():
                 return 0
             
             max_id = 0
-            with open(csv_file, "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-                if len(rows) > 1:
-                    for row in rows[1:]:
-                        if len(row) > 0:
-                            msg_id_str = row[0]  # e.g., "msg_-1003748220204_36873"
-                            parts = msg_id_str.split("_")
-                            if len(parts) >= 3:
-                                try:
-                                    raw_id = int(parts[-1])
-                                    if raw_id > max_id:
-                                        max_id = raw_id
-                                except ValueError:
-                                    pass
+            for csv_file in chats_dir.glob("messages_*.csv"):
+                with open(csv_file, "r", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+                    if len(rows) > 1:
+                        for row in rows[1:]:
+                            if len(row) > 0:
+                                msg_id_str = row[0]
+                                parts = msg_id_str.split("_")
+                                if len(parts) >= 3:
+                                    try:
+                                        raw_id = int(parts[-1])
+                                        if raw_id > max_id:
+                                            max_id = raw_id
+                                    except ValueError:
+                                        pass
             return max_id
         except Exception as e:
             logger.error(f"Error reading latest saved message ID: {e}")
             return 0
 
-    def _write_messages_to_csv(self, channel_title: str, messages: List[Dict[str, Any]]):
-        """Store scraped data in CSV channel-wise in backend data/chats/ folder (de-duplicated)."""
+    def _write_messages_to_csv(self, channel_id: str, messages: List[Dict[str, Any]]):
+        """Store scraped data in CSV date-wise under data/{channel_id}/chats/ directory."""
         try:
-            chats_dir = settings.BASE_DIR / "data" / "chats"
-            chats_dir.mkdir(parents=True, exist_ok=True)
-            
-            safe_name = self._safe_name(channel_title)
-            csv_file = chats_dir / f"messages_{safe_name}.csv"
-            
-            existing_ids = set()
-            file_exists = csv_file.exists()
-            if file_exists:
-                with open(csv_file, "r", newline="", encoding="utf-8") as rf:
-                    reader = csv.reader(rf)
-                    rows = list(reader)
-                    if len(rows) > 0:
-                        for row in rows[1:]:  # Skip header row
-                            if len(row) > 0:
-                                existing_ids.add(row[0])
-            
-            # De-duplicate: only keep messages not already stored in the CSV
-            new_messages = [m for m in messages if m.get("id") not in existing_ids]
-            if not new_messages:
-                return
-            
-            # Sort chronologically so they append in ascending order
-            new_messages.sort(key=lambda x: x.get("id"))
+            # Group messages by their posting dates converted to India Standard Time (IST)
+            ist = timezone(timedelta(hours=5, minutes=30))
+            msgs_by_date = {}
+            for msg in messages:
+                date_val = msg.get("date", "")
+                try:
+                    dt_utc = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
+                    dt_ist = dt_utc.astimezone(ist)
+                    msg_date_str = dt_ist.strftime("%Y-%m-%d")
+                except Exception:
+                    msg_date_str = datetime.now(ist).strftime("%Y-%m-%d")
+                if msg_date_str not in msgs_by_date:
+                    msgs_by_date[msg_date_str] = []
+                msgs_by_date[msg_date_str].append(msg)
 
-            with open(csv_file, "a", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                if not file_exists:
-                    writer.writerow(["message_id", "date", "sender", "text", "views", "threat_level"])
+            for date_str, date_msgs in msgs_by_date.items():
+                chats_dir = settings.DATA_DIR / channel_id / "chats"
+                chats_dir.mkdir(parents=True, exist_ok=True)
+                csv_file = chats_dir / f"messages_{date_str}.csv"
                 
-                for msg in new_messages:
-                    writer.writerow([
-                        msg.get("id"),
-                        msg.get("date"),
-                        msg.get("sender"),
-                        msg.get("text", "").replace("\n", " "),
-                        msg.get("views", 0),
-                        msg.get("threat_level", "LOW")
-                    ])
-            self.log(f"✓ Appended {len(new_messages)} new unique messages to CSV: data/chats/messages_{safe_name}.csv")
+                existing_ids = set()
+                file_exists = csv_file.exists()
+                if file_exists:
+                    with open(csv_file, "r", newline="", encoding="utf-8") as rf:
+                        reader = csv.reader(rf)
+                        rows = list(reader)
+                        if len(rows) > 0:
+                            for row in rows[1:]:  # Skip header row
+                                if len(row) > 0:
+                                    existing_ids.add(row[0])
+                
+                # De-duplicate
+                new_messages = [m for m in date_msgs if m.get("id") not in existing_ids]
+                if not new_messages:
+                    continue
+                
+                # Sort chronologically so they append in ascending order
+                new_messages.sort(key=lambda x: x.get("id"))
+
+                with open(csv_file, "a", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    if not file_exists:
+                        writer.writerow(["message_id", "date", "sender", "text", "views", "threat_level"])
+                    
+                    for msg in new_messages:
+                        writer.writerow([
+                            msg.get("id"),
+                            msg.get("date"),
+                            msg.get("sender"),
+                            msg.get("text", "").replace("\n", " "),
+                            msg.get("views", 0),
+                            msg.get("threat_level", "LOW")
+                        ])
+                self.log(f"✓ Appended {len(new_messages)} unique messages to: data/{channel_id}/chats/messages_{date_str}.csv")
         except Exception as e:
             logger.error(f"Error saving messages to CSV: {e}")
+
 
     async def check_auth_status(self) -> Dict[str, Any]:
         """Check if Telethon user session is active and authorized."""
@@ -366,8 +382,21 @@ class TelegramScraper:
                         "category": ch_type,
                         "type": ch_type,
                         "message_count": len(existing_msgs),
-                        "status": "idle"
+                        "status": "idle",
+                        "is_auto_monitoring": False,
+                        "monitoring_interval_value": 60,
+                        "monitoring_interval_unit": "minutes",
+                        "next_scrape_at": None,
+                        "is_auto_ai": False,
+                        "ai_interval_value": 60,
+                        "ai_interval_unit": "minutes",
+                        "next_ai_at": None,
+                        "is_auto_report": False,
+                        "report_interval_value": 24,
+                        "report_interval_unit": "hours",
+                        "next_report_at": None
                     }
+
                     store.channels[ch_id] = ch_data
                     imported_channels.append(ch_data)
                     real_count += 1
@@ -407,7 +436,7 @@ class TelegramScraper:
                     store.channels[ch_id]["status"] = "scraping"
 
                     # Check for incremental scraping stage
-                    latest_raw_id = self._get_latest_saved_msg_id(self.current_channel)
+                    latest_raw_id = self._get_latest_saved_msg_id(ch_id)
                     
                     if latest_raw_id > 0:
                         self.log(f"🔄 Incremental scrape active for '{self.current_channel}'. Only fetching posts newer than message ID {latest_raw_id}...")
@@ -432,16 +461,37 @@ class TelegramScraper:
                                 kwargs["min_id"] = latest_raw_id
 
                             async for message in client.iter_messages(entity, **kwargs):
-
                                 if not message.text:
                                     continue
+
                                 
+                                # Resolve sender username AND ID together
+                                sender_desc = None
+                                sender_id_str = str(message.sender_id or "unknown")
+                                try:
+                                    sender_obj = await message.get_sender()
+                                    if sender_obj:
+                                        username_val = getattr(sender_obj, 'username', None)
+                                        if username_val:
+                                            sender_desc = f"@{username_val} ({sender_id_str})"
+                                        else:
+                                            fn = getattr(sender_obj, 'first_name', None) or ""
+                                            ln = getattr(sender_obj, 'last_name', None) or ""
+                                            disp = f"{fn} {ln}".strip()
+                                            if disp:
+                                                sender_desc = f"{disp} ({sender_id_str})"
+                                except Exception:
+                                    pass
+                                
+                                if not sender_desc:
+                                    sender_desc = sender_id_str
+
                                 msg_date = message.date
                                 msg_data = {
                                     "id": f"msg_{ch_id}_{message.id}",
                                     "channel_id": str(ch_id),
                                     "channel_username": channel.get("title") or channel.get("username"),
-                                    "sender": str(message.sender_id or f"User_{ch_id}"),
+                                    "sender": sender_desc,
                                     "text": message.text,
                                     "date": msg_date.isoformat() if msg_date else datetime.utcnow().isoformat(),
                                     "views": getattr(message, "views", 10) or 10,
@@ -455,7 +505,8 @@ class TelegramScraper:
                             
                             # Store channel-wise CSV in backend (de-duplicated)
                             if scraped_from_channel:
-                                self._write_messages_to_csv(self.current_channel, scraped_from_channel)
+                                self._write_messages_to_csv(ch_id, scraped_from_channel)
+
 
                         except Exception as e:
                             self.log(f"Telethon live fetch for '{self.current_channel}' error: {e}")

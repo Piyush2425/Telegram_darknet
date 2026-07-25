@@ -17,6 +17,16 @@ export interface Channel {
   monitoring_interval_value?: number;
   monitoring_interval_unit?: string;
   next_scrape_at?: string;
+  
+  is_auto_ai?: boolean;
+  ai_interval_value?: number;
+  ai_interval_unit?: string;
+  next_ai_at?: string;
+
+  is_auto_report?: boolean;
+  report_interval_value?: number;
+  report_interval_unit?: string;
+  next_report_at?: string;
 }
 
 export interface Message {

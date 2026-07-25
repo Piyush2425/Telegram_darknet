@@ -32,12 +32,24 @@ export const scheduleChannel = async (
   channelId: string, 
   isAutoMonitoring: boolean, 
   intervalValue: number, 
-  intervalUnit: string
+  intervalUnit: string,
+  isAutoAi?: boolean,
+  aiIntervalValue?: number,
+  aiIntervalUnit?: string,
+  isAutoReport?: boolean,
+  reportIntervalValue?: number,
+  reportIntervalUnit?: string
 ): Promise<Channel> => {
   const res = await api.post(`/channels/${channelId}/schedule`, {
     is_auto_monitoring: isAutoMonitoring,
     interval_value: intervalValue,
-    interval_unit: intervalUnit
+    interval_unit: intervalUnit,
+    is_auto_ai: isAutoAi || false,
+    ai_interval_value: aiIntervalValue || 60,
+    ai_interval_unit: aiIntervalUnit || "minutes",
+    is_auto_report: isAutoReport || false,
+    report_interval_value: reportIntervalValue || 24,
+    report_interval_unit: reportIntervalUnit || "hours"
   });
   return res.data;
 };
@@ -47,10 +59,30 @@ export const deleteChannel = async (channelId: string): Promise<{ status: string
   return res.data;
 };
 
+export const generateAiReport = async (
+  channelId: string, 
+  startDate?: string, 
+  endDate?: string
+): Promise<{ report: string; channel_title: string; count: number; report_id: string }> => {
+  const res = await api.post(`/channels/${channelId}/ai-report`, {
+    start_date: startDate || undefined,
+    end_date: endDate || undefined
+  });
+  return res.data;
+};
+
+export const getLiveReport = async (channelId: string, date?: string): Promise<{ report: string; channel_title: string; date: string }> => {
+  const params = date ? { date } : {};
+  const res = await api.get(`/channels/${channelId}/live-report`, { params });
+  return res.data;
+};
+
+
 export const scrapeSingleChannel = async (channelId: string): Promise<{ status: string }> => {
   const res = await api.post(`/channels/${channelId}/scrape`);
   return res.data;
 };
+
 
 export const getMessages = async (params?: { channel_id?: string; threat_level?: string; search?: string }): Promise<Message[]> => {
   const res = await api.get('/messages', { params });

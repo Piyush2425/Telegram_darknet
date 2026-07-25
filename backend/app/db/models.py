@@ -22,6 +22,19 @@ class Channel(BaseModel):
     monitoring_interval_unit: str = "minutes"  # "minutes" or "hours"
     next_scrape_at: Optional[datetime] = None
 
+    # AI Scheduler details
+    is_auto_ai: bool = False
+    ai_interval_value: int = 60
+    ai_interval_unit: str = "minutes"  # "minutes", "hours", or "days"
+    next_ai_at: Optional[datetime] = None
+
+    # PDF Report Scheduler details
+    is_auto_report: bool = False
+    report_interval_value: int = 24
+    report_interval_unit: str = "hours"  # "minutes", "hours", or "days"
+    next_report_at: Optional[datetime] = None
+
+
 class Message(BaseModel):
     id: str
     channel_id: str
