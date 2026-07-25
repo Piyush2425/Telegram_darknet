@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Save, Key, Database, Cpu, Server, CheckCircle2, XCircle, Phone, Lock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Key, Database, Cpu, Server, CheckCircle2, XCircle, Phone, ShieldCheck, AlertCircle, Send } from 'lucide-react';
 import { getTelegramAuthStatus, sendTelegramOtpCode, verifyTelegramOtpCode } from '../services/api';
 
 export const SettingsPage: React.FC = () => {
-  const [apiId, setApiId] = useState('');
-  const [apiHash, setApiHash] = useState('');
-  const [botToken, setBotToken] = useState('');
-
-  // Telegram User Phone & OTP States
-  const [authStatus, setAuthStatus] = useState<{ is_authorized: boolean; user?: any; reason?: string }>({ is_authorized: false });
+  // Telegram API & Phone Credentials
+  const [apiId, setApiId] = useState('35816761');
+  const [apiHash, setApiHash] = useState('e8d176e13dee1feafd0ad58172e427ca');
   const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Telegram User Auth States
+  const [authStatus, setAuthStatus] = useState<{ is_authorized: boolean; user?: any; reason?: string }>({ is_authorized: false });
   const [phoneCodeHash, setPhoneCodeHash] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [password2FA, setPassword2FA] = useState('');
@@ -45,17 +45,22 @@ export const SettingsPage: React.FC = () => {
     setAuthError('');
     setAuthSuccessMsg('');
     if (!phoneNumber.trim()) {
-      setAuthError('Please enter your phone number with country code (e.g. +919876543210)');
+      setAuthError('Please enter your phone number in international format (e.g. +919876543210)');
       return;
     }
 
     setAuthLoading(true);
     try {
-      const res = await sendTelegramOtpCode(phoneNumber.trim());
+      const parsedApiId = parseInt(apiId.trim()) || 0;
+      const res = await sendTelegramOtpCode(phoneNumber.trim(), parsedApiId, apiHash.trim());
       if (res.status === 'code_sent' && res.phone_code_hash) {
         setPhoneCodeHash(res.phone_code_hash);
         setStep('OTP');
-        setAuthSuccessMsg('✓ Telegram OTP Code sent! Please check your Telegram App or SMS.');
+        setAuthSuccessMsg('✓ OTP Code sent to your Telegram App! Please enter it below.');
+      } else if (res.status === 'already_authenticated') {
+        const userObj = (res as any).user;
+        setAuthSuccessMsg(`🎉 Already authenticated as @${userObj?.username || userObj?.id}!`);
+        checkTelegramAuth();
       } else {
         setAuthError(res.error || 'Failed to send OTP code.');
       }
@@ -71,7 +76,7 @@ export const SettingsPage: React.FC = () => {
     setAuthError('');
     setAuthSuccessMsg('');
     if (!otpCode.trim()) {
-      setAuthError('Please enter the OTP code sent to your Telegram app');
+      setAuthError('Please enter the OTP code received on your Telegram app.');
       return;
     }
 
@@ -85,12 +90,12 @@ export const SettingsPage: React.FC = () => {
       );
 
       if (res.status === 'authenticated') {
-        setAuthSuccessMsg(`🎉 Successfully authenticated as @${res.user?.username || res.user?.first_name || 'User'}!`);
+        setAuthSuccessMsg(`🎉 Successfully connected as Telegram User @${res.user?.username || res.user?.first_name || 'User'}!`);
         checkTelegramAuth();
         setStep('PHONE');
         setOtpCode('');
         setPassword2FA('');
-      } else if (res.error === '2FA_PASSWORD_REQUIRED') {
+      } else if (res.status === '2fa_required' || res.error === '2FA_PASSWORD_REQUIRED') {
         setStep('2FA');
         setAuthError('Two-Factor Authentication (2FA) is enabled on your account. Please enter your 2FA Password below.');
       } else {
@@ -131,18 +136,25 @@ export const SettingsPage: React.FC = () => {
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <SettingsIcon className="w-5 h-5 text-cyan-400" />
-          Platform Settings & Telegram OTP Authentication
+          Platform Settings & System Configurations
         </h2>
-        <p className="text-xs text-slate-400">Configure Telegram Telethon User Authentication, Phone OTP, Local LLM Inference, and MongoDB.</p>
+        <p className="text-xs text-slate-400">Configure Telegram Telethon Account, Local LLM Inference (Ollama), and MongoDB storage.</p>
       </div>
 
-      {/* Telegram User Authentication & Phone OTP Card */}
-      <div className="glass-card p-6 rounded-2xl border border-telegramBlue/40 bg-telegramBlue/5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-            <Phone className="w-4 h-4" />
-            Telegram User Session & OTP Verification
-          </h3>
+      {/* UNIFIED TELEGRAM & PHONE CREDENTIALS BLOCK */}
+      <div className="glass-card p-6 rounded-2xl border border-telegramBlue/40 bg-gradient-to-br from-darkCard via-darkCard to-telegramBlue/10 space-y-5 shadow-xl">
+        <div className="flex items-center justify-between pb-3 border-b border-darkBorder">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-telegramBlue/20 text-cyan-400 flex items-center justify-center font-bold">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                Telegram Telethon Credentials & Phone Authentication
+              </h3>
+              <p className="text-[11px] text-slate-400">Enter API ID, API Hash, and Phone Number to send & verify Telegram OTP.</p>
+            </div>
+          </div>
 
           {authStatus.is_authorized ? (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
@@ -157,114 +169,128 @@ export const SettingsPage: React.FC = () => {
           )}
         </div>
 
-        {authStatus.is_authorized ? (
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1">
-            <div className="font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Telegram Account Authenticated & Session File Active!
-            </div>
-            <p className="text-[11px] text-slate-400">
-              User ID: {authStatus.user?.id} • Phone: {authStatus.user?.phone}
-            </p>
+        {authError && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
+            <XCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{authError}</span>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {authError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
-                <XCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{authError}</span>
-              </div>
-            )}
+        )}
 
-            {authSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span>{authSuccessMsg}</span>
-              </div>
-            )}
+        {authSuccessMsg && (
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{authSuccessMsg}</span>
+          </div>
+        )}
 
-            {/* STEP 1: Phone Number */}
-            {step === 'PHONE' && (
-              <form onSubmit={handleSendOtp} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Telegram Phone Number (with Country Code)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. +919876543210 or +12025550123"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="flex-1 bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
-                    />
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-darkBg text-xs font-bold rounded-xl transition-all shadow-md shadow-cyan-500/20"
-                    >
-                      {authLoading ? 'Sending OTP...' : 'Send OTP Code'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">Telegram will send a login code to your active Telegram App.</p>
-                </div>
-              </form>
-            )}
+        {/* Telegram API Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API ID</label>
+            <input
+              type="text"
+              placeholder="e.g. 35816761"
+              value={apiId}
+              onChange={(e) => setApiId(e.target.value)}
+              className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
 
-            {/* STEP 2: OTP Verification */}
-            {(step === 'OTP' || step === '2FA') && (
-              <form onSubmit={handleVerifyOtp} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Telegram Login OTP Code
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 58392"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-cyan-500 focus:outline-none font-mono text-center tracking-widest text-base font-bold"
-                    />
-                  </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API Hash</label>
+            <input
+              type="password"
+              placeholder="e.g. e8d176e13..."
+              value={apiHash}
+              onChange={(e) => setApiHash(e.target.value)}
+              className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
+        </div>
 
-                  {step === '2FA' && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">
-                        Two-Factor (2FA) Password
-                      </label>
-                      <input
-                        type="password"
-                        placeholder="Enter 2FA password"
-                        value={password2FA}
-                        onChange={(e) => setPassword2FA(e.target.value)}
-                        className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
+        {/* Phone & OTP Authentication Flow */}
+        <div className="pt-2 border-t border-darkBorder/60 space-y-4">
+          {step === 'PHONE' && (
+            <form onSubmit={handleSendOtp} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-cyan-400" />
+                  Telegram Account Phone Number (International Format)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. +919876543210 or +12025550123"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="flex-1 bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+                  />
                   <button
                     type="submit"
                     disabled={authLoading}
-                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-darkBg text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-500/20"
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-cyan-500/20"
                   >
-                    {authLoading ? 'Verifying OTP...' : 'Verify OTP & Log In'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setStep('PHONE'); setAuthError(''); setAuthSuccessMsg(''); }}
-                    className="px-3 py-2.5 bg-darkBorder text-slate-400 text-xs font-bold rounded-xl"
-                  >
-                    Back
+                    <Send className="w-3.5 h-3.5" />
+                    {authLoading ? 'Sending OTP...' : 'Send OTP Code'}
                   </button>
                 </div>
-              </form>
-            )}
-          </div>
-        )}
+                <p className="text-[11px] text-slate-500 mt-1">Telegram will send a login verification code directly to your official Telegram App.</p>
+              </div>
+            </form>
+          )}
+
+          {(step === 'OTP' || step === '2FA') && (
+            <form onSubmit={handleVerifyOtp} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Telegram Login OTP Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 58392"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-cyan-500 focus:outline-none font-mono text-center tracking-widest text-base font-bold"
+                  />
+                </div>
+
+                {step === '2FA' && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Two-Factor (2FA) Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Enter 2FA password"
+                      value={password2FA}
+                      onChange={(e) => setPassword2FA(e.target.value)}
+                      className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-darkBg text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-500/20"
+                >
+                  {authLoading ? 'Verifying OTP...' : 'Verify OTP & Authorize Session'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setStep('PHONE'); setAuthError(''); setAuthSuccessMsg(''); }}
+                  className="px-3 py-2.5 bg-darkBorder text-slate-400 text-xs font-bold rounded-xl"
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -326,39 +352,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Telegram API Credentials */}
-        <div className="glass-card p-6 rounded-2xl border border-darkBorder space-y-4">
-          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-            <Key className="w-4 h-4 text-cyan-400" />
-            Telegram Telethon API Credentials
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API ID</label>
-              <input
-                type="text"
-                placeholder="e.g. 35816761"
-                value={apiId}
-                onChange={(e) => setApiId(e.target.value)}
-                className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API Hash</label>
-              <input
-                type="password"
-                placeholder="e.g. e8d176e13..."
-                value={apiHash}
-                onChange={(e) => setApiHash(e.target.value)}
-                className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Storage */}
+        {/* Database Storage Configuration */}
         <div className="glass-card p-6 rounded-2xl border border-darkBorder space-y-4">
           <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
             <Database className="w-4 h-4 text-emerald-400" />
