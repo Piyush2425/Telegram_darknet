@@ -4,9 +4,9 @@ import { getTelegramAuthStatus, sendTelegramOtpCode, verifyTelegramOtpCode } fro
 
 export const SettingsPage: React.FC = () => {
   // Telegram API & Phone Credentials
-  const [apiId, setApiId] = useState('35816761');
-  const [apiHash, setApiHash] = useState('e8d176e13dee1feafd0ad58172e427ca');
-  const [phoneNumber, setPhoneNumber] = useState('+917276538133');
+  const [apiId, setApiId] = useState('');
+  const [apiHash, setApiHash] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   // Telegram User Auth States
   const [authStatus, setAuthStatus] = useState<{ is_authorized: boolean; user?: any; reason?: string }>({ is_authorized: false });
@@ -194,8 +194,8 @@ export const SettingsPage: React.FC = () => {
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API ID</label>
             <input
-              type="text"
-              placeholder="e.g. 35816761"
+              type="password"
+              placeholder="Loaded from backend .env"
               value={apiId}
               onChange={(e) => setApiId(e.target.value)}
               className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
@@ -206,7 +206,7 @@ export const SettingsPage: React.FC = () => {
             <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API Hash</label>
             <input
               type="password"
-              placeholder="e.g. e8d176e13..."
+              placeholder="Loaded from backend .env"
               value={apiHash}
               onChange={(e) => setApiHash(e.target.value)}
               className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
