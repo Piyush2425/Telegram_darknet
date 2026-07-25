@@ -54,15 +54,19 @@ export const getTelegramAuthStatus = async (): Promise<{ is_authorized: boolean;
   return res.data;
 };
 
-export const sendTelegramOtpCode = async (phoneNumber: string): Promise<{ status: string; phone_code_hash?: string; error?: string }> => {
-  const res = await api.post('/telegram/auth/send-code', { phone_number: phoneNumber });
+export const sendTelegramOtpCode = async (phoneNumber: string, apiId?: number, apiHash?: string): Promise<{ status: string; phone_code_hash?: string; error?: string }> => {
+  const res = await api.post('/telegram/auth/send-code', { 
+    phone_number: phoneNumber,
+    api_id: apiId || 0,
+    api_hash: apiHash || ""
+  });
   return res.data;
 };
 
 export const verifyTelegramOtpCode = async (
   phoneNumber: string, 
   code: string, 
-  phoneCodeHash: string, 
+  phoneCodeHash?: string, 
   password?: string
 ): Promise<{ status: string; user?: any; error?: string; message?: string }> => {
   const res = await api.post('/telegram/auth/verify-code', {

@@ -8,11 +8,13 @@ router = APIRouter(prefix="/telegram/auth", tags=["Telegram Auth"])
 
 class SendCodeRequest(BaseModel):
     phone_number: str
+    api_id: Optional[int] = 0
+    api_hash: Optional[str] = ""
 
 class VerifyCodeRequest(BaseModel):
     phone_number: str
     code: str
-    phone_code_hash: str
+    phone_code_hash: Optional[str] = None
     password: Optional[str] = None
 
 @router.get("/status")
@@ -27,7 +29,11 @@ async def send_otp_code(req: SendCodeRequest):
     if not req.phone_number:
         raise HTTPException(status_code=400, detail="Phone number is required")
 
-    result = await telegram_scraper.send_otp_code(req.phone_number)
+    result = await telegram_scraper.send_otp_code(
+        phone_number=req.phone_number,
+        api_id=req.api_id or 0,
+        api_hash=req.api_hash or ""
+    )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -42,5 +48,7 @@ async def verify_otp_code(req: VerifyCodeRequest):
         password=req.password
     )
     if "error" in result:
+        if result["error"] == "2FA_PASSWORD_REQUIRED":
+            return {"status": "2fa_required", "error": result["error"], "message": result.get("message")}
         raise HTTPException(status_code=400, detail=result["error"])
     return result
