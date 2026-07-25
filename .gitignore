@@ -13,7 +13,7 @@ dist/
 frontend/dist/
 *.tsbuildinfo
 .npm/
-
+data/
 # Python Cache & Build
 __pycache__/
 *.py[cod]
@@ -31,7 +31,7 @@ build/
 *.env
 .env.*
 !.env.example
-
+data
 # Database & Session files
 *.db
 *.sqlite
