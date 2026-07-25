@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Send, ShieldAlert, Eye, MessageSquare, AlertCircle } from 'lucide-react';
-import { getChannels, getMessages, toggleChannelMonitoring } from '../services/api';
+import { Search, Plus, Eye, MessageSquare, Radio, ShieldCheck } from 'lucide-react';
+import { getChannels, getMessages, toggleChannelMonitoring, addCustomChannel } from '../services/api';
 import { Channel, Message } from '../types';
 
 export const TelegramPage: React.FC = () => {
@@ -8,26 +8,27 @@ export const TelegramPage: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  
+  // Add Channel Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    setLoading(true);
     try {
       const chs = await getChannels();
       setChannels(chs);
-      if (chs.length > 0) {
+      if (chs.length > 0 && !selectedChannel) {
         setSelectedChannel(chs[0]);
         const msgs = await getMessages({ channel_id: chs[0].id });
         setMessages(msgs);
       }
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -45,17 +46,45 @@ export const TelegramPage: React.FC = () => {
     }
   };
 
+  const handleAddChannelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim()) return;
+    setAdding(true);
+    try {
+      const added = await addCustomChannel(newUsername);
+      setChannels(prev => [...prev, added]);
+      setSelectedChannel(added);
+      setNewUsername('');
+      setShowAddModal(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const filteredChannels = channels.filter(c => 
     c.title.toLowerCase().includes(search.toLowerCase()) || 
     c.username.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="h-[calc(100vh-6.5rem)] flex bg-telegramDark rounded-2xl overflow-hidden border border-darkBorder shadow-2xl">
+    <div className="h-[calc(100vh-6.5rem)] flex bg-telegramDark rounded-2xl overflow-hidden border border-darkBorder shadow-2xl relative">
       {/* Left Chat List (Telegram Style) */}
       <div className="w-80 bg-darkCard/90 border-r border-darkBorder flex flex-col shrink-0">
-        {/* Search Bar */}
-        <div className="p-3 border-b border-darkBorder">
+        {/* Top Controls: Search & Add Channel */}
+        <div className="p-3 border-b border-darkBorder space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Telegram Channels</span>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg border border-cyan-500/30 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Channel
+            </button>
+          </div>
+
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
@@ -85,10 +114,8 @@ export const TelegramPage: React.FC = () => {
                   {ch.username.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="overflow-hidden">
-                  <div className="text-xs font-semibold truncate flex items-center gap-1.5">
-                    {ch.title}
-                  </div>
-                  <div className="text-[10px] opacity-75 truncate">@{ch.username}</div>
+                  <div className="text-xs font-semibold truncate">@{ch.username}</div>
+                  <div className="text-[10px] opacity-75 truncate">{ch.title}</div>
                 </div>
               </div>
 
@@ -102,7 +129,6 @@ export const TelegramPage: React.FC = () => {
 
       {/* Right Chat Conversation View */}
       <div className="flex-1 flex flex-col bg-darkBg/80">
-        {/* Chat Header */}
         {selectedChannel ? (
           <div className="h-14 px-6 bg-darkCard/90 border-b border-darkBorder flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -165,14 +191,59 @@ export const TelegramPage: React.FC = () => {
           ))}
 
           {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500">
-              <MessageSquare className="w-12 h-12 mb-2 opacity-30" />
-              <p className="text-sm">No messages collected for this channel yet.</p>
-              <p className="text-xs text-slate-600">Run the Scraper Controller to pull messages.</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
+              <MessageSquare className="w-12 h-12 opacity-30" />
+              <p className="text-sm font-medium">No messages collected for @{selectedChannel?.username} yet.</p>
+              <p className="text-xs text-slate-400">Click "Scrape Controller" in the sidebar to scrape live messages from your Telegram account.</p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Add Custom Channel Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-darkCard border border-darkBorder w-full max-w-md p-6 rounded-2xl space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-cyan-400" />
+              Add Target Telegram Channel
+            </h3>
+            <p className="text-xs text-slate-400">Enter any public or private Telegram channel or group username to monitor.</p>
+
+            <form onSubmit={handleAddChannelSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Telegram Username</label>
+                <input
+                  type="text"
+                  placeholder="e.g. durov, cybersecurity_feed, breachforums"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-darkBorder text-slate-300 text-xs font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={adding}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-darkBg text-xs font-bold rounded-xl transition-all"
+                >
+                  {adding ? 'Adding...' : 'Add Channel'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

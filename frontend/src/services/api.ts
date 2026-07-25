@@ -13,6 +13,11 @@ export const getChannels = async (): Promise<Channel[]> => {
   return res.data;
 };
 
+export const addCustomChannel = async (username: string, title?: string): Promise<Channel> => {
+  const res = await api.post('/channels/add', { username, title });
+  return res.data;
+};
+
 export const toggleChannelMonitoring = async (channelId: string): Promise<{ channel_id: string; is_monitored: boolean }> => {
   const res = await api.post(`/channels/${channelId}/toggle-monitoring`);
   return res.data;

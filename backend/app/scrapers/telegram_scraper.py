@@ -1,11 +1,20 @@
+import os
 import asyncio
-import random
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from ..config import settings
 
 logger = logging.getLogger("darknet_monitor.scraper")
+
+# Try Telethon import
+telethon_available = False
+try:
+    from telethon import TelegramClient
+    from telethon.errors import RPCError
+    telethon_available = True
+except ImportError:
+    telethon_available = False
 
 MOCK_MESSAGES_POOL = [
     {
@@ -22,32 +31,18 @@ MOCK_MESSAGES_POOL = [
         "text": "Lumma Stealer v4.2 updated with bypass for Chrome 127 Application-Bound Encryption. Features cookie stealing, Telegram session hijacker, and MetaMask wallet grabber. C2 server: 194.165.16.82:8080. Contact LummaDev on Tox.",
         "threat_level": "CRITICAL",
         "views": 5120
-    },
-    {
-        "text": "LockBit 3.0 ransomware builder leak update: New decryptor tools published by research group. Check GitHub repo https://github.com/threat-research/lockbit-decrypt for updated signatures and master key lists.",
-        "threat_level": "MEDIUM",
-        "views": 8900
-    },
-    {
-        "text": "COMBO LIST RELEASE: 50,000 Verified corporate emails and pass combos for Office365 and VPN portals. Sample: admin@enterprise-corp.com:P@ssw0rd2026! | security@techfirm.org:Summer2026! Check http://combostore.xyz/free.txt.",
-        "threat_level": "HIGH",
-        "views": 2340
-    },
-    {
-        "text": "CVE-2026-3021 RCE in Apache Struts payload generator tool. Exploits unauthenticated deserialization vulnerability. Target IP scanner script included. IP list: 45.142.214.10, 185.220.101.4.",
-        "threat_level": "HIGH",
-        "views": 1850
     }
 ]
 
 class TelegramScraper:
-    """Telegram Scraper integrating Telethon client with mock data fallback generator."""
+    """Telegram Scraper supporting live Telethon client and demo telemetry fallback."""
 
     def __init__(self):
         self.is_scraping = False
         self.progress = 0
         self.current_channel = ""
         self.logs: List[str] = []
+        self.client = None
 
     def log(self, message: str):
         timestamp = datetime.utcnow().strftime("%H:%M:%S")
@@ -57,47 +52,115 @@ class TelegramScraper:
             self.logs.pop(0)
         logger.info(log_entry)
 
+    async def get_telethon_client(self):
+        """Initialize Telethon Client if API ID & Hash are provided."""
+        api_id = settings.TELEGRAM_API_ID
+        api_hash = settings.TELEGRAM_API_HASH
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+
+        if not telethon_available:
+            self.log("Telethon library not installed. Running in simulation mode.")
+            return None
+
+        if api_id > 0 and api_hash:
+            try:
+                session_path = str(settings.BASE_DIR / "darknet_session")
+                client = TelegramClient(session_path, api_id, api_hash)
+                if bot_token:
+                    await client.start(bot_token=bot_token)
+                else:
+                    await client.connect()
+                return client
+            except Exception as e:
+                self.log(f"Telethon connection warning: {e}. Falling back to demo telemetry.")
+                return None
+        else:
+            self.log("Telegram API ID / API Hash not configured in .env or Settings. Running in demo mode.")
+            return None
+
     async def scrape_channels(self, channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Simulate or execute Telegram channel scraping."""
+        """Fetch real Telegram messages via Telethon or fallback to demo telemetry."""
         self.is_scraping = True
         self.progress = 0
         self.logs.clear()
-        self.log(f"Starting Telegram data collection for {len(channels)} target channels...")
-        
+        self.log(f"Initiating Telegram data collection across {len(channels)} channels...")
+
+        client = await self.get_telethon_client()
         all_scraped_messages = []
         total_channels = len(channels)
 
         for idx, channel in enumerate(channels):
-            self.current_channel = channel.get("username", "Unknown")
-            self.log(f"Connecting to Telegram API... Fetching updates from @{self.current_channel}")
-            
-            await asyncio.sleep(0.8)  # simulate API latency
-            
-            # Generate 3-5 realistic messages per channel
-            num_messages = random.randint(3, 5)
-            for m_idx in range(num_messages):
-                sample = random.choice(MOCK_MESSAGES_POOL)
-                msg_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 120))
-                
-                msg_data = {
-                    "id": f"msg_{channel['id']}_{m_idx}_{int(msg_time.timestamp())}",
-                    "channel_id": channel["id"],
-                    "channel_username": channel.get("username", "Unknown"),
-                    "sender": f"User_{random.randint(1000, 9999)}",
-                    "text": sample["text"],
-                    "date": msg_time.isoformat(),
-                    "views": sample["views"] + random.randint(10, 500),
-                    "media_url": None,
-                    "threat_level": sample["threat_level"],
-                    "analyzed": False
-                }
-                all_scraped_messages.append(msg_data)
+            username = channel.get("username", "").replace("@", "").strip()
+            self.current_channel = username
+            self.log(f"Connecting to Telegram API... Fetching live posts from @{username}")
 
-            self.log(f"Extracted {num_messages} messages from @{self.current_channel}")
+            scraped_from_channel = []
+
+            if client and await client.is_user_authorized():
+                try:
+                    # Fetch REAL live messages using Telethon
+                    entity = await client.get_entity(username)
+                    async for message in client.iter_messages(entity, limit=30):
+                        if not message.text:
+                            continue
+                        
+                        msg_date = message.date if message.date else datetime.utcnow()
+                        msg_data = {
+                            "id": f"msg_{channel['id']}_{message.id}",
+                            "channel_id": channel["id"],
+                            "channel_username": username,
+                            "sender": message.sender_id or f"User_{username}",
+                            "text": message.text,
+                            "date": msg_date.isoformat(),
+                            "views": getattr(message, "views", 100) or 100,
+                            "media_url": None,
+                            "threat_level": "LOW",  # Will be assessed by LLM Threat Analyzer
+                            "analyzed": False
+                        }
+                        scraped_from_channel.append(msg_data)
+
+                    self.log(f"✓ REAL Telegram API: Scraped {len(scraped_from_channel)} live posts from @{username}")
+                except Exception as e:
+                    self.log(f"Real Telethon fetch for @{username} encountered error: {e}. Generating demo telemetry.")
+                    scraped_from_channel = self._generate_mock_messages(channel)
+            else:
+                # Demo telemetry fallback
+                await asyncio.sleep(0.8)
+                scraped_from_channel = self._generate_mock_messages(channel)
+                self.log(f"Demo Mode: Generated {len(scraped_from_channel)} telemetry posts for @{username}")
+
+            all_scraped_messages.extend(scraped_from_channel)
             self.progress = int(((idx + 1) / total_channels) * 100)
 
-        self.log(f"Scraping completed! Total {len(all_scraped_messages)} messages collected across {total_channels} channels.")
+        if client:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+
+        self.log(f"Scraping completed! Total {len(all_scraped_messages)} messages collected.")
         self.is_scraping = False
         return all_scraped_messages
+
+    def _generate_mock_messages(self, channel: Dict[str, Any]) -> List[Dict[str, Any]]:
+        import random
+        num_messages = random.randint(3, 5)
+        msgs = []
+        for m_idx in range(num_messages):
+            sample = random.choice(MOCK_MESSAGES_POOL)
+            msg_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 120))
+            msgs.append({
+                "id": f"msg_{channel['id']}_{m_idx}_{int(msg_time.timestamp())}",
+                "channel_id": channel["id"],
+                "channel_username": channel.get("username", "Unknown"),
+                "sender": f"User_{random.randint(1000, 9999)}",
+                "text": sample["text"],
+                "date": msg_time.isoformat(),
+                "views": sample["views"] + random.randint(10, 500),
+                "media_url": None,
+                "threat_level": sample["threat_level"],
+                "analyzed": False
+            })
+        return msgs
 
 telegram_scraper = TelegramScraper()
