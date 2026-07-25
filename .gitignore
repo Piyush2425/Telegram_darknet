@@ -1,0 +1,54 @@
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+*.venv
+backend/.venv/
+backend/venv/
+
+# Node / JavaScript
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+.npm/
+
+# Python Cache & Build
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+*.spec
+
+# Environment & Secret Files
+.env
+*.env
+.env.*
+!.env.example
+
+# Database & Session files
+*.db
+*.sqlite
+*.sqlite3
+*.session
+*.session-journal
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+

@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --background: 222 47% 8%;
+  --foreground: 210 40% 98%;
+  --card: 224 44% 11%;
+  --card-foreground: 210 40% 98%;
+  --muted: 223 24% 18%;
+  --muted-foreground: 215 20% 72%;
+  --accent: 180 80% 35%;
+  --accent-foreground: 222 47% 8%;
+  --primary: 180 80% 42%;
+  --primary-foreground: 222 47% 8%;
+  --border: 220 28% 20%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: 'Inter', 'Manrope', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.11), transparent 25%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 24%),
+    linear-gradient(180deg, #08111d 0%, #050b15 100%);
+  color: hsl(var(--foreground));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+select {
+  font: inherit;
+  background-color: rgba(15, 23, 42, 0.85);
+  color: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.25rem;
+  padding-right: 2.5rem !important;
+}
+
+select option {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+::selection {
+  background: rgba(20, 184, 166, 0.28);
+  color: white;
+}
+
+/* ── Shimmer skeleton ─────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* ── Pulse ring (status dots) ─────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  70%  { transform: scale(2.2); opacity: 0;   }
+  100% { transform: scale(1);   opacity: 0;   }
+}
+
+/* ── Fade-in-up (page entrance) ───────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/10 bg-slate-900/55 backdrop-blur-xl shadow-[0_20px_50px_rgba(2,6,23,0.24)];
+  }
+
+  .section-title {
+    @apply text-[20px] font-semibold tracking-tight text-slate-50;
+  }
+
+  .page-title {
+    @apply text-[28px] font-bold tracking-tight text-slate-50 lg:text-[32px];
+  }
+
+  .metric-value {
+    @apply text-[24px] font-bold text-slate-50 lg:text-[28px];
+  }
+
+  .metric-subtitle {
+    @apply text-[11px] uppercase tracking-[0.18em] text-slate-400;
+  }
+
+  /* Shimmer placeholder bar */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.10) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
+    background-size: 800px 100%;
+    animation: shimmer 1.6s infinite linear;
+    border-radius: 12px;
+  }
+
+  /* Pulsing status indicator */
+  .pulse-dot {
+    position: relative;
+    display: inline-block;
+    border-radius: 9999px;
+  }
+  .pulse-dot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    background: currentColor;
+    opacity: 0.4;
+  }
+
+  /* Page entrance animation */
+  .page-enter {
+    animation: fade-in-up 0.35s ease both;
+  }
+}
+
+/* ── Scrollbar styling ────────────────────────────────────────── */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.15) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+/* ── Subtle glow effect ───────────────────────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(34, 211, 238, 0.15); }
+  50%      { box-shadow: 0 0 14px rgba(34, 211, 238, 0.3); }
+}
+
+.glow-pulse {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* ── Slide-in from left ───────────────────────────────────────── */
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.slide-in-left {
+  animation: slide-in-left 0.3s ease-out both;
+}
