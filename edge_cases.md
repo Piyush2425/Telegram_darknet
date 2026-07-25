@@ -1,36 +1,57 @@
-# 🛡️ Telegram Darknet Monitor: Threat Vectors & Edge Cases Guide
+# Project Edge Cases and Solutions
 
-This document lists potential edge cases, data anomalies, and connectivity scenarios that can occur within the Telegram Darknet Monitor system, along with how our system handles or mitigates them.
+This is a simple list of edge cases that can happen in the Telegram Darknet Monitor project and how we solve them.
 
----
+### 🔌 Telegram Connection and Auth Issues
 
-## 📡 1. Telegram API & Connectivity Edge Cases
+* **Telegram Rate Limits (Flood Wait):**
+  If we try to fetch too many messages at once, Telegram blocks us. 
+  *Solution:* We use incremental scraping. The app only fetches messages that are newer than the last message we successfully saved, avoiding rate limits.
 
-| Edge Case | Potential Impact | Our Mitigation Strategy |
-| :--- | :--- | :--- |
-| **Telegram Flood Wait Rates** | If scraping a huge message history at once, Telegram triggers a `FloodWaitError` and blocks requests. | We configured incremental scraping. Except for the first run, the scraper only crawls messages since the `latest_saved_id`, keeping queries small and silent. |
-| **Corrupted SQLite Session File** | If the `.session` file gets corrupted, Telethon fails to initialize. | `telegram_scraper.py` detects sqlite corruption (e.g., `nonce` or `auth_key` exceptions), deletes the locked `.session` files automatically, and re-initiates the login cycle. |
-| **2FA Security Enforcements** | User has Two-Factor Authentication (2FA) active on their Telegram account. | The authentication route supports a multi-step login flow (`PHONE` -> `OTP` -> `2FA`) to verify passwords dynamically. |
-| **Channel Deletions / Private Bans** | A monitored channel is deleted or the user is kicked out. | The scraper wraps entity checks inside try-except blocks, falling back to cached details and logging an warning without crashing the scheduler loop. |
+* **Corrupted Session Files:**
+  If the `.session` database file gets locked or corrupted, the program will crash.
+  *Solution:* The scraper automatically detects session errors, deletes the broken session file, and resets it so you can log in again.
 
----
+* **Two-Factor Authentication (2FA):**
+  If your Telegram account has 2FA enabled, simple OTP login fails.
+  *Solution:* We built a multi-stage login system that supports standard phone number OTP and prompts you for your 2FA password if needed.
 
-## 🧠 2. LLM Analysis & Processing Edge Cases
-
-| Edge Case | Potential Impact | Our Mitigation Strategy |
-| :--- | :--- | :--- |
-| **Context Window Overflow** | Crawling thousands of messages at once exceeds the LLM context window (e.g., 8k tokens). | The scraper groups messages in small hourly/daily batches and runs incremental AI cycles to summarize newly collected intelligence step-by-step. |
-| **Local CPU/GPU Timeouts** | Ollama running on a CPU can take long periods, causing connection timeouts. | We increased connection timeouts to 120 seconds and implemented a **regex indicator extraction fallback** if the LLM fails. |
-| **Malformed LLM JSON Output** | The LLM returns syntax-broken JSON that breaks standard code parsers. | We implemented strict regex fallbacks and schema validation guards to clean and normalize JSON responses. |
-| **Empty Scrape Cycles** | No new messages are scraped in the scheduled cycle. | The scheduler checks message counts first; if there are no new posts, it skips the LLM API call entirely to save processing power and tokens. |
+* **Channel Bans or Deletion:**
+  If a channel you are monitoring gets banned, deleted, or you are kicked out, the code might crash trying to fetch it.
+  *Solution:* The scraper wraps entity checks in protective checks. If a channel is inaccessible, it logs a warning but keeps running without crashing.
 
 ---
 
-## 📝 3. CTI Data & Report Parsing Edge Cases
+### 🧠 LLM and AI Processing Issues
 
-| Edge Case | Potential Impact | Our Mitigation Strategy |
-| :--- | :--- | :--- |
-| **Escaped Structural Characters** | If messages contain pipes (`|`), standard splits parse them into extra columns, distorting the tables. | We parse tables using negative lookbehinds `(?<!\\)\|` to ignore escaped pipes, keeping columns aligned. |
-| **ReportLab Cell Discrepancies** | Rows with different cell counts than headers crash or misalign the PDF layout. | `pdf_generator.py` normalizes cell counts: padding shorter rows and merging extra columns back into the message body. |
-| **Time Zone Divergences** | Using server UTC dates causes file partition naming and scheduler shifts. | The platform synchronizes all scrapers, daily partitions, ledgers, and timers to India Standard Time (IST, UTC+5:30). |
-| **Duplicate Threat Indicators** | The same malicious IP or onion link is posted multiple times. | The daily JSON state database merges duplicates, incrementing the **Mention Count** and updating the **Last Seen (IST)** timestamp. |
+* **LLM Timeouts (Slow Local CPU):**
+  Running a local AI model on a CPU is slow and can time out.
+  *Solution:* We increased the connection timeout to 120 seconds. If the AI still fails or times out, the backend immediately falls back to a deterministic regex parser to extract URLs and IOCs without using the AI.
+
+* **Broken AI Output:**
+  The AI might output corrupted JSON text that standard JSON libraries cannot parse.
+  *Solution:* We use validation checks. If the JSON is invalid, the system automatically falls back to regex extractors to parse the data safely.
+
+* **Empty Scrapes:**
+  If no new messages were scraped, calling the LLM wastes CPU and API tokens.
+  *Solution:* The scheduler checks message counts first. If there are 0 new messages, it skips the LLM analysis entirely.
+
+---
+
+### 📋 Data and PDF Report Issues
+
+* **Pipes "|" in Chat Messages:**
+  If a chat message contains the pipe symbol `|`, it breaks markdown tables.
+  *Solution:* We parse tables using a regex that splits columns only on actual structural boundaries and ignores escaped pipes (`\|`).
+
+* **PDF Layout Crashes:**
+  If table rows have different numbers of columns, the ReportLab PDF builder crashes.
+  *Solution:* The PDF builder normalizes all rows. It pads shorter rows with blank spaces and merges extra columns back into the text body.
+
+* **Time Zone Differences:**
+  Using UTC dates makes scrapers and files save on the wrong day depending on local time.
+  *Solution:* We synchronized all scrapers, file partitions, daily report names, and schedulers to India Standard Time (IST, UTC+5:30).
+
+* **Duplicate Threat Data:**
+  If the same link, wallet, or IP address is posted multiple times, it creates duplicates in the reports.
+  *Solution:* The daily JSON database merges duplicates, increments the Mention Count, and updates the Last Seen timestamp.
