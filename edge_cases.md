@@ -55,3 +55,16 @@ This is a simple list of edge cases that can happen in the Telegram Darknet Moni
 * **Duplicate Threat Data:**
   If the same link, wallet, or IP address is posted multiple times, it creates duplicates in the reports.
   *Solution:* The daily JSON database merges duplicates, increments the Mention Count, and updates the Last Seen timestamp.
+
+* **Network Disconnections during Scraping:**
+  If the internet drops while a scrape task is running, the client gets stuck.
+  *Solution:* Scrapers run inside try-except blocks. If a connection error occurs, the scraper logs the error and resets the channel status back to "idle" so the scheduler is never blocked.
+
+* **Manually Deleted Data Directories:**
+  If a user deletes the `data/` or channel CSV folder while the server is active.
+  *Solution:* All folder writes check and create parent folders on the fly using `mkdir(parents=True, exist_ok=True)`.
+
+* **Local LLM Service Offline:**
+  If Ollama is shut down, closed, or not listening on port 11434, calls will fail.
+  *Solution:* Backend catches requests connection errors immediately and runs the regex fallback threat extractor so you still get structured threat metrics.
+
