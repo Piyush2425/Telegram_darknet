@@ -22,7 +22,7 @@ The analysis results are organized into structured intelligence reports, allowin
 
 ## Key Features
 
-* Telegram-like web interface displaying all monitored channels and groups
+* Telegram monitor web interface displaying all channels and groups
 * Browse and search Telegram channels from a centralized dashboard
 * Select one or multiple channels for scraping
 * Manual and scheduled scraping of Telegram data
@@ -37,14 +37,13 @@ The analysis results are organized into structured intelligence reports, allowin
 
 ## Technology Stack
 
-* **Frontend:** HTML, CSS, JavaScript, Bootstrap
-* **Backend:** Python, Flask
+* **Frontend:** HTML, CSS, JavaScript, Bootstrap / React
+* **Backend:** Python, FastAPI / Flask
 * **Database:** MongoDB
-* **Telegram Integration:** Telethon
+* **Telegram Integration:** Telethon / Telegram Bot API
 * **AI Analysis:** Large Language Model (LLM)
 * **Reporting:** Markdown and PDF Generation
 * **Automation:** Background Scheduler
-* **Deployment:** Docker
 
 ## Workflow
 
