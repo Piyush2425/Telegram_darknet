@@ -55,9 +55,4 @@ Analysts can compile and download professional intelligence reports on-the-fly:
 
 ---
 
-## 🔒 6. Enterprise Security & Developer DX
 
-- **Credential UI Masking**: Masks sensitive fields like your **Telegram API ID** and **API Hash** behind password inputs on the Settings page to prevent accidental exposures.
-- **Automated `.env` Fallback**: If settings inputs are left blank, the system automatically falls back to your local `.env` configuration.
-- **Git Shielding**: Configured `.gitignore` to untrack the `data/` folder and session files, preventing your private scraping database from leaking to public GitHub repositories.
-- **Concurrent Boot Script (`darknet serve`)**: Allows booting both the FastAPI backend and Vite React frontend concurrently in one click using a single terminal, handling shutdown signals cleanly.
