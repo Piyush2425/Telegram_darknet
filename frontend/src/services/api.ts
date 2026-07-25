@@ -48,4 +48,30 @@ export const getReports = async (): Promise<Report[]> => {
   return res.data;
 };
 
+// Telegram Auth & OTP API
+export const getTelegramAuthStatus = async (): Promise<{ is_authorized: boolean; user?: any; reason?: string }> => {
+  const res = await api.get('/telegram/auth/status');
+  return res.data;
+};
+
+export const sendTelegramOtpCode = async (phoneNumber: string): Promise<{ status: string; phone_code_hash?: string; error?: string }> => {
+  const res = await api.post('/telegram/auth/send-code', { phone_number: phoneNumber });
+  return res.data;
+};
+
+export const verifyTelegramOtpCode = async (
+  phoneNumber: string, 
+  code: string, 
+  phoneCodeHash: string, 
+  password?: string
+): Promise<{ status: string; user?: any; error?: string; message?: string }> => {
+  const res = await api.post('/telegram/auth/verify-code', {
+    phone_number: phoneNumber,
+    code,
+    phone_code_hash: phoneCodeHash,
+    password
+  });
+  return res.data;
+};
+
 export default api;

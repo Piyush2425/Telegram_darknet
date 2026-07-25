@@ -6,6 +6,7 @@ from .api.scraper import router as scraper_router
 from .api.messages import router as messages_router
 from .api.intelligence import router as intel_router
 from .api.reports import router as reports_router
+from .api.auth import router as auth_router
 from .db.mongodb import get_db_status
 
 app = FastAPI(
@@ -29,6 +30,7 @@ app.include_router(scraper_router, prefix="/api")
 app.include_router(messages_router, prefix="/api")
 app.include_router(intel_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():

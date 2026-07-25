@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..config import settings
 
 logger = logging.getLogger("darknet_monitor.scraper")
@@ -11,7 +11,7 @@ logger = logging.getLogger("darknet_monitor.scraper")
 telethon_available = False
 try:
     from telethon import TelegramClient
-    from telethon.errors import RPCError
+    from telethon.errors import SessionPasswordNeededError, RPCError
     telethon_available = True
 except ImportError:
     telethon_available = False
@@ -35,14 +35,14 @@ MOCK_MESSAGES_POOL = [
 ]
 
 class TelegramScraper:
-    """Telegram Scraper supporting live Telethon client and demo telemetry fallback."""
+    """Telegram Scraper with Telethon OTP Login, session management, and live scraping."""
 
     def __init__(self):
         self.is_scraping = False
         self.progress = 0
         self.current_channel = ""
         self.logs: List[str] = []
-        self.client = None
+        self.client: Optional[Any] = None
 
     def log(self, message: str):
         timestamp = datetime.utcnow().strftime("%H:%M:%S")
@@ -52,31 +52,104 @@ class TelegramScraper:
             self.logs.pop(0)
         logger.info(log_entry)
 
-    async def get_telethon_client(self):
-        """Initialize Telethon Client if API ID & Hash are provided."""
+    def _get_session_client(self):
+        if not telethon_available:
+            return None
         api_id = settings.TELEGRAM_API_ID
         api_hash = settings.TELEGRAM_API_HASH
-        bot_token = settings.TELEGRAM_BOT_TOKEN
+        if api_id <= 0 or not api_hash:
+            return None
 
+        session_path = str(settings.BASE_DIR / "darknet_session")
+        return TelegramClient(session_path, api_id, api_hash)
+
+    async def check_auth_status((self) -> Dict[str, Any]:
+        """Check if Telethon user session is active and authorized."""
         if not telethon_available:
-            self.log("Telethon library not installed. Running in simulation mode.")
-            return None
+            return {"is_authorized": False, "reason": "Telethon library missing"}
 
-        if api_id > 0 and api_hash:
+        api_id = settings.TELEGRAM_API_ID
+        api_hash = settings.TELEGRAM_API_HASH
+
+        if api_id <= 0 or not api_hash:
+            return {"is_authorized": False, "reason": "API ID and API Hash not set in .env"}
+
+        client = self._get_session_client()
+        if not client:
+            return {"is_authorized": False, "reason": "Could not create Telethon client"}
+
+        try:
+            await client.connect()
+            is_auth = await client.is_user_authorized()
+            user_info = None
+            if is_auth:
+                me = await client.get_me()
+                user_info = {
+                    "id": me.id,
+                    "username": me.username,
+                    "first_name": me.first_name,
+                    "phone": me.phone
+                }
+            await client.disconnect()
+            return {
+                "is_authorized": is_auth,
+                "user": user_info,
+                "api_id": api_id
+            }
+        except Exception as e:
+            return {"is_authorized": False, "reason": str(e)}
+
+    async def send_otp_code(self, phone_number: str) -> Dict[str, Any]:
+        """Send Telegram OTP code to phone number."""
+        client = self._get_session_client()
+        if not client:
+            return {"error": "Invalid API ID or API Hash. Please set them in Settings or .env first."}
+
+        try:
+            await client.connect()
+            res = await client.send_code_request(phone_number)
+            await client.disconnect()
+            return {
+                "status": "code_sent",
+                "phone_number": phone_number,
+                "phone_code_hash": res.phone_code_hash
+            }
+        except Exception as e:
+            self.log(f"Error sending OTP to {phone_number}: {e}")
+            return {"error": str(e)}
+
+    async def verify_otp_code(self, phone_number: str, code: str, phone_code_hash: str, password: Optional[str] = None) -> Dict[str, Any]:
+        """Verify OTP code and complete Telethon sign-in."""
+        client = self._get_session_client()
+        if not client:
+            return {"error": "Telethon client unavailable."}
+
+        try:
+            await client.connect()
             try:
-                session_path = str(settings.BASE_DIR / "darknet_session")
-                client = TelegramClient(session_path, api_id, api_hash)
-                if bot_token:
-                    await client.start(bot_token=bot_token)
-                else:
-                    await client.connect()
-                return client
-            except Exception as e:
-                self.log(f"Telethon connection warning: {e}. Falling back to demo telemetry.")
-                return None
-        else:
-            self.log("Telegram API ID / API Hash not configured in .env or Settings. Running in demo mode.")
-            return None
+                user = await client.sign_in(phone=phone_number, code=code, phone_code_hash=phone_code_hash)
+            except SessionPasswordNeededError:
+                if not password:
+                    await client.disconnect()
+                    return {"error": "2FA_PASSWORD_REQUIRED", "message": "Two-Factor Authentication (2FA) password required"}
+                user = await client.sign_in(password=password)
+
+            me = await client.get_me()
+            await client.disconnect()
+
+            self.log(f"Successfully authenticated Telegram session for @{me.username or me.id}!")
+            return {
+                "status": "authenticated",
+                "user": {
+                    "id": me.id,
+                    "username": me.username,
+                    "first_name": me.first_name,
+                    "phone": me.phone
+                }
+            }
+        except Exception as e:
+            self.log(f"Error verifying OTP code: {e}")
+            return {"error": str(e)}
 
     async def scrape_channels(self, channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Fetch real Telegram messages via Telethon or fallback to demo telemetry."""
@@ -85,9 +158,16 @@ class TelegramScraper:
         self.logs.clear()
         self.log(f"Initiating Telegram data collection across {len(channels)} channels...")
 
-        client = await self.get_telethon_client()
+        client = self._get_session_client()
         all_scraped_messages = []
         total_channels = len(channels)
+
+        if client:
+            try:
+                await client.connect()
+            except Exception as e:
+                self.log(f"Telethon client connection failed: {e}")
+                client = None
 
         for idx, channel in enumerate(channels):
             username = channel.get("username", "").replace("@", "").strip()
@@ -109,12 +189,12 @@ class TelegramScraper:
                             "id": f"msg_{channel['id']}_{message.id}",
                             "channel_id": channel["id"],
                             "channel_username": username,
-                            "sender": message.sender_id or f"User_{username}",
+                            "sender": str(message.sender_id or f"User_{username}"),
                             "text": message.text,
                             "date": msg_date.isoformat(),
                             "views": getattr(message, "views", 100) or 100,
                             "media_url": None,
-                            "threat_level": "LOW",  # Will be assessed by LLM Threat Analyzer
+                            "threat_level": "LOW",
                             "analyzed": False
                         }
                         scraped_from_channel.append(msg_data)
