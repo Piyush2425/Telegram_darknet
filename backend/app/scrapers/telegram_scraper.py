@@ -63,7 +63,7 @@ class TelegramScraper:
         session_path = str(settings.BASE_DIR / "darknet_session")
         return TelegramClient(session_path, api_id, api_hash)
 
-    async def check_auth_status((self) -> Dict[str, Any]:
+    async def check_auth_status(self) -> Dict[str, Any]:
         """Check if Telethon user session is active and authorized."""
         if not telethon_available:
             return {"is_authorized": False, "reason": "Telethon library missing"}
