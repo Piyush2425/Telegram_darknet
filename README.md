@@ -137,4 +137,15 @@ Return to the root folder and run:
 
 ---
 
-Press `Ctrl + C` in your terminal to shut down both backend and frontend services concurrently!
+## 💻 Running the Command in Terminal
+
+Below is a quick reference for running the service command depending on your terminal shell:
+
+| Operating System / Shell | Command to Run | Action Required First |
+| :--- | :--- | :--- |
+| **Windows (PowerShell)** | `.\darknet serve` | None |
+| **Windows (Command Prompt / CMD)** | `darknet serve` | None |
+| **Linux / macOS (Bash / Zsh)** | `./darknet serve` | Run `chmod +x darknet` first |
+
+> [!TIP]
+> To stop both backend and frontend servers at any time, simply press **`Ctrl + C`** in your terminal window.
