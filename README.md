@@ -1,61 +1,90 @@
-# Telegram Darknet Monitor
+# 🛡️ Telegram Darknet Monitor: Cyber Threat Intelligence Command Center
 
-**Telegram Darknet Monitor** is a full-stack Cyber Threat Intelligence (CTI) platform designed to monitor Telegram channels and groups for cybersecurity-related discussions. The application provides a **Telegram-like web interface** where analysts can browse all available channels and groups, select the channels to monitor, and initiate data collection directly from the dashboard.
+**Telegram Darknet Monitor** is a state-of-the-art, full-stack Cyber Threat Intelligence (CTI) platform designed to monitor Telegram channels and groups for cybersecurity threat telemetry, credential leaks, and cyberattack coordination. 
 
-The platform continuously scrapes messages from selected Telegram channels using the Telegram API and stores the collected data in a structured MongoDB database. Once scraping is complete, an integrated **Large Language Model (LLM)** automatically analyzes the collected conversations to identify suspicious activities and extract actionable cyber threat intelligence.
+The application provides a sleek **dark-mode analyst dashboard** where users can browse target channels, monitor scrapers, customize scheduler rules, view stateful intelligence ledgers, and export professional PDF intelligence briefings.
 
-The LLM processes each message to detect and categorize:
+---
 
-* URLs and shared links
-* Suspicious or malicious activities
-* Threat actor mentions
-* Malware and ransomware references
-* CVEs and software vulnerabilities
-* Indicators of Compromise (IOCs)
-* Cryptocurrency wallet addresses
-* Email addresses
-* Domains and IP addresses
-* Credentials or leaked data references
-* Emerging attack techniques and discussions
+## 🎯 Key Architectural Features
 
-The analysis results are organized into structured intelligence reports, allowing analysts to quickly understand the most important findings without manually reviewing thousands of messages. The platform generates both **Markdown** and **PDF** reports for archival, sharing, and further investigation.
+### 1. 3-Column Schedulers
+Configure and manage three independent background workflows per channel:
+- **Auto-Scraping**: Fetches new messages silently via Telethon and logs them chronologically to daily `.csv` files.
+- **Auto-AI Cycles**: Triggers the local LLM to run incremental, low-latency json threat extractions on new message segments. Updates the daily CTI ledger dynamically.
+- **Auto-Report PDF Compiler**: Runs longer compilation tasks to build final page-numbered PDF briefings from the accumulated daily ledgers.
 
-## Key Features
+### 2. Stateful daily CTI Ledger (`.md` & `.state.json`)
+The application maintains a stateful CTI database ledger per channel per day:
+- **Deduplication**: If a URL, Onion link, suspicious username, or IOC (CVEs, IPs, Crypto Wallets) appears multiple times, the ledger automatically **increments its Mention Count** and updates its **Last Seen (IST)** timestamp.
+- **Suspicious Username Filtering**: The LLM automatically filters standard chat participants, logging *only* threat actors and malicious sellers.
+- **Evidence Block**: A chronological transcript table (`Time | Sender | Chat Message`) is cleanly appended at the bottom as audit evidence.
 
-* Telegram monitor web interface displaying all channels and groups
-* Browse and search Telegram channels from a centralized dashboard
-* Select one or multiple channels for scraping
-* Manual and scheduled scraping of Telegram data
-* Real-time scraping progress and monitoring status
-* Structured storage of messages and metadata in MongoDB
-* Automated LLM-powered message analysis
-* Detection of suspicious discussions and cyber threat indicators
-* Extraction of URLs, IOCs, CVEs, malware names, threat actors, domains, IP addresses, cryptocurrency wallets, and email addresses
-* Automatic report generation in Markdown and PDF formats
-* Historical report archive and search functionality
-* Responsive dark-mode dashboard for cyber threat monitoring
+### 3. Professional PDF Reports & UI Parser
+- **On-the-Fly PDF Exporter**: Convert daily CTI ledgers into ReportLab PDFs with headers, footers, page numbering, and formatted table layouts.
+- **Frontend Markdown Parser**: Renders the daily `.md` report dynamically inside the dashboard with colored severity badges (CRITICAL, HIGH, MEDIUM, LOW) and active hyperlinks.
 
-## Technology Stack
+---
 
-* **Frontend:** HTML, CSS, JavaScript, Bootstrap / React
-* **Backend:** Python, FastAPI / Flask
-* **Database:** MongoDB
-* **Telegram Integration:** Telethon / Telegram Bot API
-* **AI Analysis:** Large Language Model (LLM)
-* **Reporting:** Markdown and PDF Generation
-* **Automation:** Background Scheduler
+## 📁 Project Directory Structure
 
-## Workflow
+```
+├── backend/                  # FastAPI Backend API Server
+│   ├── app/
+│   │   ├── api/              # Route handlers (channels, messages, reports)
+│   │   ├── db/               # In-memory MongoDB stores
+│   │   ├── llm/              # Threat analyzer & LLM json extraction prompts
+│   │   ├── reports/          # ReportLab PDF compiler
+│   │   └── scrapers/         # Telethon scrapers & background schedulers
+│   ├── run.py                # Backend boot script
+│   └── .env                  # Backend environment settings (API ID, Hash, LLM URL)
+│
+├── frontend/                 # Vite + React Frontend Client
+│   ├── src/
+│   │   ├── pages/            # Dashboard, Channel Details, Scraper Control
+│   │   ├── services/         # Axios API client integrations
+│   │   └── types/            # TypeScript type definitions
+│   └── package.json          # Node dependencies
+│
+├── data/                     # Stateful channel partitioning database (CSV, MD, JSON)
+│   └── {channel_id}/
+│       ├── chats/            # Partitioned raw message CSVs
+│       └── reports/          # Daily log ledgers (.md, .json) and PDF exports (.pdf)
+│
+├── darknet.py                # Python concurrent server boot script
+└── darknet.bat               # Windows command wrapper
+```
 
-1. Load all available Telegram channels and groups into the web dashboard.
-2. Allow the analyst to select one or more channels for monitoring.
-3. Scrape messages from the selected Telegram channels.
-4. Store all collected messages and metadata in MongoDB.
-5. Process the scraped data using an LLM.
-6. Detect URLs, suspicious activities, threat intelligence indicators, malware references, CVEs, IOCs, and other cybersecurity-relevant entities.
-7. Generate structured Markdown and PDF intelligence reports.
-8. Present reports, analytics, and findings through the web dashboard.
+---
 
-## Project Goal
+## 🚀 Quick Start Guide
 
-The goal of **Telegram Darknet Monitor** is to provide security analysts and cyber threat intelligence teams with a centralized platform that combines Telegram data collection, AI-powered analysis, and automated reporting. By integrating continuous Telegram monitoring with LLM-based intelligence extraction, the platform significantly reduces manual analysis effort while enabling faster identification of emerging cyber threats and suspicious activities.
+### 1. Prerequisites
+- Python 3.8 or higher.
+- Node.js (v18+) & NPM.
+- A local LLM engine active (e.g. **Ollama** running `llama3` or `mistral`).
+
+### 2. Configuration
+Create a `.env` file inside the `backend/` directory:
+```env
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+USE_LOCAL_LLM=True
+LOCAL_LLM_URL=http://localhost:11434/api/generate
+LOCAL_LLM_MODEL=llama3
+```
+
+### 3. Start Both Services in One Click
+You can launch both the **FastAPI Backend Server** (port `8000`) and the **Vite Frontend Dev Client** (port `5173`) concurrently using our unified runner tool:
+
+- **In CMD (Command Prompt)**:
+  ```cmd
+  darknet serve
+  ```
+
+- **In PowerShell**:
+  ```powershell
+  .\darknet serve
+  ```
+
+Press `Ctrl + C` in your terminal to shut down both services cleanly and concurrently!
