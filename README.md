@@ -51,40 +51,90 @@ The application maintains a stateful CTI database ledger per channel per day:
 │       ├── chats/            # Partitioned raw message CSVs
 │       └── reports/          # Daily log ledgers (.md, .json) and PDF exports (.pdf)
 │
-├── darknet.py                # Python concurrent server boot script
-└── darknet.bat               # Windows command wrapper
+│── darknet.py                # Python concurrent server boot script
+├── darknet.bat               # Windows command wrapper
+└── darknet                   # Linux / macOS shell command wrapper
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Installation & Setup Guides
 
-### 1. Prerequisites
-- Python 3.8 or higher.
-- Node.js (v18+) & NPM.
-- A local LLM engine active (e.g. **Ollama** running `llama3` or `mistral`).
+### 🐧 Linux / Ubuntu Setup Guide
 
-### 2. Configuration
-Create a `.env` file inside the `backend/` directory:
-```env
-TELEGRAM_API_ID=your_api_id
-TELEGRAM_API_HASH=your_api_hash
-USE_LOCAL_LLM=True
-LOCAL_LLM_URL=http://localhost:11434/api/generate
-LOCAL_LLM_MODEL=llama3
+#### 1. Install System Dependencies
+Update your package list and install Python (with venv) and Node.js:
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv nodejs npm
 ```
 
-### 3. Start Both Services in One Click
-You can launch both the **FastAPI Backend Server** (port `8000`) and the **Vite Frontend Dev Client** (port `5173`) concurrently using our unified runner tool:
+#### 2. Configure Backend API
+Clone the repository and set up the Python environment:
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# Optional: Install testing tools
+pip install pytest pytest-asyncio httpx
+```
 
+Create a `.env` configuration file:
+```bash
+cp .env.example .env
+nano .env
+```
+Fill in your `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`.
+
+#### 3. Configure Frontend Client
+Install the Node dependencies:
+```bash
+cd ../frontend
+npm install
+```
+
+#### 4. Grant Script Permissions & Run Services
+Go back to the root folder, grant execute permissions to our runner script, and run both services with a single command:
+```bash
+cd ..
+chmod +x darknet
+./darknet serve
+```
+
+---
+
+### 🪟 Windows Setup Guide
+
+#### 1. Configure Backend API
+Open PowerShell or Command Prompt in the repository root and navigate to the backend folder:
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+pip install pytest pytest-asyncio httpx
+```
+Create a `.env` file from `.env.example` and fill in your API credentials.
+
+#### 2. Configure Frontend Client
+Install dependencies:
+```powershell
+cd ../frontend
+npm install
+```
+
+#### 3. Run Services
+Return to the root folder and run:
+- **In PowerShell**:
+  ```powershell
+  .\darknet serve
+  ```
 - **In CMD (Command Prompt)**:
   ```cmd
   darknet serve
   ```
 
-- **In PowerShell**:
-  ```powershell
-  .\darknet serve
-  ```
+---
 
-Press `Ctrl + C` in your terminal to shut down both services cleanly and concurrently!
+Press `Ctrl + C` in your terminal to shut down both backend and frontend services concurrently!
