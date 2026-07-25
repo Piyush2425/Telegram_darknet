@@ -60,6 +60,10 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
         # 2. Query LLM JSON extraction in separate thread
         extracted = await asyncio.to_thread(analyzer.extract_cycle_threats, unspent_msgs, ch["title"])
         
+        # Check if fallback was triggered and log warning to Scraper Console
+        if extracted.get("fallback_triggered"):
+            telegram_scraper.log(f"⚠ Local LLM Offline/Failed: {extracted.get('fallback_reason')}. Running fallback regex threat extraction.")
+        
         # Mark messages as analyzed in memory
         for m in unspent_msgs:
             m["ai_analyzed_in_cycle"] = True

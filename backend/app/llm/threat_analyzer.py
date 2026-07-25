@@ -275,6 +275,7 @@ Logs to analyze:
 {msg_contents}
 """
         
+        fallback_reason = None
         if self.use_local:
             try:
                 payload = {
@@ -290,6 +291,7 @@ Logs to analyze:
                     return json.loads(raw_resp)
             except Exception as e:
                 logger.warning(f"JSON LLM extraction failed: {e}. Running fallback regex extraction.")
+                fallback_reason = str(e)
                 
         # Regex Offline Fallback
         from .regex_extractors import extract_indicators_with_regex
@@ -336,7 +338,7 @@ Logs to analyze:
                     "malicious_context": ", ".join(reasons) + f": {text[:100]}"
                 })
                 
-        return {
+        result = {
             "threat_alerts": [{"title": "Suspicious Indicators Flagged", "severity": "MEDIUM", "description": "Deterministic rules engines matched darknet threat patterns."}] if suspicious_users else [],
             "suspicious_users": suspicious_users,
             "urls": all_urls[:10],
@@ -345,6 +347,10 @@ Logs to analyze:
             "topics": ["Darknet Telemetry Logs"],
             "executive_summary": "System compiled threat metrics via local fallback engine."
         }
+        if fallback_reason:
+            result["fallback_triggered"] = True
+            result["fallback_reason"] = fallback_reason
+        return result
 
 analyzer = LLMThreatAnalyzer()
 
