@@ -201,6 +201,13 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
         state_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.state.json"
         log_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.md"
         
+        # Self-healing: if state files are missing, reset flags to force full ledger compilation
+        url_state_path = channel_reports_dir / "url.state.json"
+        if not state_path.exists() or not url_state_path.exists():
+            for m in store.messages.values():
+                if m.get("channel_id") == channel_id:
+                    m["ai_analyzed_in_cycle"] = False
+                    
         # 1. Fetch channel messages for today that have not been analyzed in a mini-cycle yet
         msgs = [m for m in store.messages.values() if m.get("channel_id") == channel_id]
         unspent_msgs = []

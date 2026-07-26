@@ -222,6 +222,10 @@ async def scrape_single_channel_task(channel_id: str):
         rep_meta = report_generator.generate_report(messages, threat_intels, [ch.get("username", ch.get("title"))])
         store.reports[rep_meta["id"]] = rep_meta
 
+    # Trigger incremental analysis cycle and URL ledger compilation instantly!
+    from ..scrapers.scheduler import run_mini_ai_analysis_cycle
+    await run_mini_ai_analysis_cycle(channel_id)
+
 @router.post("/{channel_id}/scrape")
 async def scrape_single_channel(channel_id: str, background_tasks: BackgroundTasks):
     """Trigger a scrape run for a single channel."""
