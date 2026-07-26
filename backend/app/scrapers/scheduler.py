@@ -1,4 +1,3 @@
-# pyrefly: ignore [missing-import]
 import asyncio
 import logging
 import json
@@ -17,222 +16,11 @@ def append_raw_chats_to_daily_log(channel_id: str, channel_title: str, messages:
     """Placeholder to maintain daily running transcript log logic without double-logging."""
     pass
 
-async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_messages: list, reports_dir, llm_extracted_data: dict = None):
-    """
-    Extracts URLs/domains/IPs/emails statefully from new messages (via custom extractor)
-    and merges LLM-flagged URLs/onions/IOCs, separating them by source in url.state.json and url.md.
-    """
-    from ..llm.ioc_extractor import extract_indicators_hybrid
-    from pathlib import Path
-    import tldextract
-    import re
-    
-    state_path = Path(reports_dir) / "url.state.json"
-    md_path = Path(reports_dir) / "url.md"
-    
-    url_state = {"indicators": []}
-    if state_path.exists():
-        try:
-            with open(state_path, "r", encoding="utf-8") as rf:
-                url_state = json.load(rf)
-        except Exception as e:
-            logger.error(f"Error reading url.state.json: {e}")
-            
-    now_time_str = datetime.now(IST).strftime("%H:%M:%S IST")
-    
-    # Ensure backwards compatibility for legacy JSON files missing the 'source' key
-    for ind in url_state["indicators"]:
-        if "source" not in ind:
-            ind["source"] = "Extractor"
-
-    # Helper function to merge an indicator statefully
-    def merge_indicator(val: str, norm: str, type_str: str, source_str: str):
-        val_clean = val.strip().strip(".,;:?!()[]{}'\"")
-        if not val_clean:
-            return
-        
-        match = None
-        for exist in url_state["indicators"]:
-            if exist["value"].lower() == val_clean.lower() and exist.get("source", "Extractor").lower() == source_str.lower():
-                match = exist
-                break
-                
-        if match:
-            match["count"] = match.get("count", 1) + 1
-            match["last_seen"] = now_time_str
-        else:
-            url_state["indicators"].append({
-                "value": val_clean,
-                "normalized": norm,
-                "type": type_str,
-                "source": source_str,
-                "count": 1,
-                "last_seen": now_time_str
-            })
-
-    # 1. Merge Extractor Indicators from messages
-    for m in new_messages:
-        text = m.get("text", "")
-        if not text:
-            continue
-        try:
-            found = extract_indicators_hybrid(text)
-            for item in found:
-                merge_indicator(item["value"], item["normalized"], item["type"], "Extractor")
-        except Exception as e:
-            logger.error(f"Error parsing hybrid indicators for msg {m.get('id')}: {e}")
-
-    # 2. Merge LLM-extracted Indicators (from AI analysis cycle data)
-    if llm_extracted_data:
-        # Standard URLs
-        raw_urls = llm_extracted_data.get("urls") or []
-        for item in raw_urls:
-            url_val = item if isinstance(item, str) else (item.get("url") or item.get("link") if isinstance(item, dict) else "")
-            if url_val:
-                ext = tldextract.extract(url_val)
-                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else url_val
-                type_lbl = "Onion" if ".onion" in url_val.lower() else "Web URL"
-                merge_indicator(url_val, norm, type_lbl, "LLM")
-                
-        # Onion links
-        raw_onions = llm_extracted_data.get("onions") or []
-        for item in raw_onions:
-            onion_val = item if isinstance(item, str) else (item.get("url") or item.get("link") or item.get("onion") if isinstance(item, dict) else "")
-            if onion_val:
-                ext = tldextract.extract(onion_val)
-                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else "onion"
-                merge_indicator(onion_val, norm, "Onion", "LLM")
-
-        # IOCs
-        raw_iocs = llm_extracted_data.get("iocs") or []
-        for item in raw_iocs:
-            ioc_val = item if isinstance(item, str) else (item.get("value") or item.get("indicator") if isinstance(item, dict) else "")
-            if ioc_val:
-                # Guess type
-                ext = tldextract.extract(ioc_val)
-                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else ioc_val
-                
-                type_lbl = "Bare Domain"
-                if "@" in ioc_val:
-                    type_lbl = "Email"
-                    norm = ioc_val.split("@")[-1]
-                elif re.match(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", ioc_val):
-                    type_lbl = "IP"
-                    norm = ioc_val
-                elif ".onion" in ioc_val.lower():
-                    type_lbl = "Onion"
-                    norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else "onion"
-                elif "cve-" in ioc_val.lower():
-                    type_lbl = "Bare Domain"
-                    
-                merge_indicator(ioc_val, norm, type_lbl, "LLM")
-
-    # Save JSON state
-    try:
-        with open(state_path, "w", encoding="utf-8") as wf:
-            json.dump(url_state, wf, indent=2)
-    except Exception as e:
-        logger.error(f"Error writing url.state.json: {e}")
-        
-    # Compile markdown ledger report
-    indicators = url_state["indicators"]
-    extractor_list = [x for x in indicators if x.get("source", "Extractor") == "Extractor"]
-    llm_list = [x for x in indicators if x.get("source", "Extractor") == "LLM"]
-    
-    md_lines = [
-        f"# 🌐 Cyber Threat Intelligence URL Ledger: {channel_title}",
-        "",
-        "This file contains a stateful historical record of all URLs, onion links, emails, bare domains, and IP addresses extracted from this channel.",
-        "It partitions indicators into deterministic matches found by the automated scraping parser (Extractor) and cognitive matches flagged by the local LLM model (LLM).",
-        "",
-        "## 📈 Summary Statistics",
-        f"- **Total Unique Extractor Indicators:** {len(extractor_list)}",
-        f"- **Total Unique LLM Indicators:** {len(llm_list)}",
-        "",
-        "## 🔗 1. Deterministic Extractor Indicators",
-        ""
-    ]
-    
-    if extractor_list:
-        md_lines.append("| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |")
-        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
-        # Sort by mention count desc
-        sorted_ext = sorted(extractor_list, key=lambda x: x.get("count", 1), reverse=True)
-        for ind in sorted_ext:
-            val = ind["value"]
-            val_display = f"[{val}]({val})" if (ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://"))) else f"`{val}`"
-            md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
-    else:
-        md_lines.append("_No automated extractor indicators collected yet._")
-        
-    md_lines.append("\n## 🧠 2. LLM AI Extracted Indicators")
-    md_lines.append("")
-    
-    if llm_list:
-        md_lines.append("| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |")
-        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
-        # Sort by count desc
-        sorted_llm = sorted(llm_list, key=lambda x: x.get("count", 1), reverse=True)
-        for ind in sorted_llm:
-            val = ind["value"]
-            val_display = f"[{val}]({val})" if (ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://"))) else f"`{val}`"
-            md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
-    else:
-        md_lines.append("_No cognitive LLM indicators flagged yet._")
-        
-    try:
-        with open(md_path, "w", encoding="utf-8") as wf:
-            wf.write("\n".join(md_lines))
-        telegram_scraper.log(f"✓ Stateful URL Ledger updated: data/{channel_id}/reports/url.md")
-    except Exception as e:
-        logger.error(f"Error compiling url.md: {e}")
-
-def load_all_channel_messages_from_csv(channel_id: str) -> list:
-    """Load all messages from the date-wise CSV files for this channel."""
-    from ..config import settings
-    import csv
-    
-    messages = []
-    chats_dir = settings.DATA_DIR / channel_id / "chats"
-    if not chats_dir.exists():
-        return messages
-        
-    for csv_file in chats_dir.glob("messages_*.csv"):
-        try:
-            with open(csv_file, "r", newline="", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-                if len(rows) > 1:
-                    # Header: message_id, date, sender, text, views, threat_level
-                    for row in rows[1:]:
-                        if len(row) >= 6:
-                            messages.append({
-                                "id": row[0],
-                                "channel_id": channel_id,
-                                "date": row[1],
-                                "sender": row[2],
-                                "text": row[3],
-                                "views": int(row[4]) if row[4].isdigit() else 10,
-                                "threat_level": row[5]
-                            })
-        except Exception as e:
-            logger.error(f"Error loading CSV file {csv_file.name}: {e}")
-            
-    return messages
-
 async def run_mini_ai_analysis_cycle(channel_id: str):
     """Run an incremental AI analysis cycle, statefully updating daily JSON database and compiling the clean markdown report ledger."""
     ch = store.channels.get(channel_id)
     if not ch:
         return
-        
-    # Check if messages exist in store.messages; if not, load them from CSV first!
-    channel_msgs_in_mem = [m for m in store.messages.values() if m.get("channel_id") == channel_id]
-    if not channel_msgs_in_mem:
-        logger.info(f"Memory empty. Loading historical messages from CSV for channel {channel_id}...")
-        csv_msgs = load_all_channel_messages_from_csv(channel_id)
-        for m in csv_msgs:
-            store.messages[m["id"]] = m
         
     try:
         from ..config import settings
@@ -243,13 +31,6 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
         state_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.state.json"
         log_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.md"
         
-        # Self-healing: if state files are missing, reset flags to force full ledger compilation
-        url_state_path = channel_reports_dir / "url.state.json"
-        if not state_path.exists() or not url_state_path.exists():
-            for m in store.messages.values():
-                if m.get("channel_id") == channel_id:
-                    m["ai_analyzed_in_cycle"] = False
-                    
         # 1. Fetch channel messages for today that have not been analyzed in a mini-cycle yet
         msgs = [m for m in store.messages.values() if m.get("channel_id") == channel_id]
         unspent_msgs = []
@@ -489,9 +270,6 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
                 "event": f"[{alert['severity']}] {alert['title']} - {alert['description']}"
             })
             
-        # Update stateful URL and indicator ledger
-        await update_url_ioc_ledger(channel_id, ch["title"], unspent_msgs, channel_reports_dir, extracted)
-        
         # Save daily state database JSON
         with open(state_path, "w", encoding="utf-8") as wf:
             json.dump(state, wf, indent=2)

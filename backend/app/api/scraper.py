@@ -29,15 +29,6 @@ async def run_scraping_job():
     store.reports[rep_meta["id"]] = rep_meta
     telegram_scraper.log(f"Generated new intelligence report: {rep_meta['title']}")
 
-    # Trigger incremental analysis cycle and URL ledger compilation for each monitored channel!
-    from ..scrapers.scheduler import run_mini_ai_analysis_cycle
-    for ch in monitored:
-        try:
-            await run_mini_ai_analysis_cycle(ch["id"])
-        except Exception as e:
-            import logging
-            logging.getLogger("darknet_monitor.scraper").error(f"Error executing manual scraper CTI cycle: {e}")
-
 @router.post("/start")
 async def start_scraping(background_tasks: BackgroundTasks):
     """Trigger manual Telegram scraping and LLM threat extraction."""
