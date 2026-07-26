@@ -60,6 +60,27 @@ The application maintains a stateful CTI database ledger per channel per day:
 
 ## 🚀 Installation & Setup Guides
 
+### 🔑 Step 0: Get Telegram API Credentials (Required)
+To connect with the real Telegram network, you need a Telegram developer profile:
+1. Go to **[https://my.telegram.org](https://my.telegram.org)**.
+2. Enter your phone number (with country code) and verify it using the confirmation code sent to your Telegram app.
+3. Click on **API Development Tools**.
+4. Create a new application (you can enter any app name and short name).
+5. Copy your **App api_id** and **App api_hash** to a secure notepad. You will need these for the `.env` file.
+
+---
+
+### 🦙 Step 1: Set Up Local AI Threat Analysis (Recommended)
+This project uses a local Large Language Model (LLM) to perform offline threat analysis:
+1. Download and install **Ollama** from **[https://ollama.com](https://ollama.com)**.
+2. Open your terminal or command prompt and run the following command to download the model:
+   ```bash
+   ollama pull llama3.1:8b
+   ```
+3. Keep the Ollama application running in the background.
+
+---
+
 ### 🐧 Linux / Ubuntu Setup Guide
 
 #### 1. Install System Dependencies
