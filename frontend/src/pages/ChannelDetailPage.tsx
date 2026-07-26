@@ -46,9 +46,9 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-darkBorder/20 text-slate-300">
+          <tbody className="divide-y divide-darkBorder/20 text-slate-700">
             {dataRows.map((row, idx) => (
-              <tr key={idx} className="hover:bg-darkCard/10 transition-colors">
+              <tr key={idx} className="hover:bg-slate-50 transition-colors">
                 {row.map((cell, cellIdx) => {
                   const val = cell.trim();
                   
@@ -56,14 +56,14 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                   const headerText = (headers[cellIdx] || "").trim().toLowerCase();
                   let alignment = "py-2 px-3 leading-relaxed break-words whitespace-pre-wrap select-all";
                   if (headerText.includes("count")) {
-                    alignment = "py-2 px-3 text-center font-bold text-cyan-400";
+                    alignment = "py-2 px-3 text-center font-bold text-cyan-600";
                   }
 
                   // Render links cleanly
                   const linkMatch = val.match(/\[(.*?)\]\((.*?)\)/);
                   if (linkMatch) {
                     return (
-                      <td key={cellIdx} className="py-2 px-3 font-mono text-cyan-400 font-bold break-all">
+                      <td key={cellIdx} className="py-2 px-3 font-mono text-cyan-600 font-bold break-all">
                         <a href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="hover:underline">
                           {linkMatch[1]}
                         </a>
@@ -75,7 +75,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                   if (val.toUpperCase() === 'HIGH' || val.toUpperCase() === 'CRITICAL') {
                     return (
                       <td key={cellIdx} className="py-2 px-3">
-                        <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold uppercase text-[9px]">
+                        <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 border border-rose-500/20 font-bold uppercase text-[9px]">
                           {val}
                         </span>
                       </td>
@@ -84,7 +84,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                   if (val.toUpperCase() === 'MEDIUM') {
                     return (
                       <td key={cellIdx} className="py-2 px-3">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase text-[9px]">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 font-bold uppercase text-[9px]">
                           {val}
                         </span>
                       </td>
@@ -93,7 +93,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                   if (val.toUpperCase() === 'LOW') {
                     return (
                       <td key={cellIdx} className="py-2 px-3">
-                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold uppercase text-[9px]">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold uppercase text-[9px]">
                           {val}
                         </span>
                       </td>
@@ -103,7 +103,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                   // Inline code formatting
                   if (val.startsWith('`') && val.endsWith('`')) {
                     return (
-                      <td key={cellIdx} className="py-2 px-3 font-mono text-indigo-300 break-all select-all">
+                      <td key={cellIdx} className="py-2 px-3 font-mono text-indigo-600 break-all select-all">
                         {val.slice(1, -1)}
                       </td>
                     );
@@ -163,20 +163,20 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
       );
     } else if (line.startsWith('* ') || line.startsWith('- ')) {
       elements.push(
-        <div key={idx} className="flex items-start gap-2.5 my-1 ml-3 text-slate-300 text-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0 animate-pulse" />
+        <div key={idx} className="flex items-start gap-2.5 my-1 ml-3 text-slate-700 text-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-600 mt-1.5 shrink-0 animate-pulse" />
           <span className="leading-relaxed select-text select-all">{line.slice(2)}</span>
         </div>
       );
     } else if (line.startsWith('> ')) {
       elements.push(
-        <blockquote key={idx} className="border-l-2 border-cyan-500/40 bg-cyan-950/15 p-2.5 rounded-r-lg my-1.5 text-xs italic text-slate-400 select-text leading-relaxed whitespace-pre-wrap select-all">
+        <blockquote key={idx} className="border-l-2 border-cyan-500/40 bg-cyan-500/5 p-2.5 rounded-r-lg my-1.5 text-xs italic text-slate-600 select-text leading-relaxed whitespace-pre-wrap select-all">
           {line.replace('> ', '')}
         </blockquote>
       );
     } else {
       elements.push(
-        <p key={idx} className="text-xs text-slate-300 my-1 leading-relaxed select-text select-all">
+        <p key={idx} className="text-xs text-slate-700 my-1 leading-relaxed select-text select-all">
           {line}
         </p>
       );
