@@ -186,11 +186,52 @@ async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_message
     except Exception as e:
         logger.error(f"Error compiling url.md: {e}")
 
+def load_all_channel_messages_from_csv(channel_id: str) -> list:
+    """Load all messages from the date-wise CSV files for this channel."""
+    from ..config import settings
+    import csv
+    
+    messages = []
+    chats_dir = settings.DATA_DIR / channel_id / "chats"
+    if not chats_dir.exists():
+        return messages
+        
+    for csv_file in chats_dir.glob("messages_*.csv"):
+        try:
+            with open(csv_file, "r", newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                if len(rows) > 1:
+                    # Header: message_id, date, sender, text, views, threat_level
+                    for row in rows[1:]:
+                        if len(row) >= 6:
+                            messages.append({
+                                "id": row[0],
+                                "channel_id": channel_id,
+                                "date": row[1],
+                                "sender": row[2],
+                                "text": row[3],
+                                "views": int(row[4]) if row[4].isdigit() else 10,
+                                "threat_level": row[5]
+                            })
+        except Exception as e:
+            logger.error(f"Error loading CSV file {csv_file.name}: {e}")
+            
+    return messages
+
 async def run_mini_ai_analysis_cycle(channel_id: str):
     """Run an incremental AI analysis cycle, statefully updating daily JSON database and compiling the clean markdown report ledger."""
     ch = store.channels.get(channel_id)
     if not ch:
         return
+        
+    # Check if messages exist in store.messages; if not, load them from CSV first!
+    channel_msgs_in_mem = [m for m in store.messages.values() if m.get("channel_id") == channel_id]
+    if not channel_msgs_in_mem:
+        logger.info(f"Memory empty. Loading historical messages from CSV for channel {channel_id}...")
+        csv_msgs = load_all_channel_messages_from_csv(channel_id)
+        for m in csv_msgs:
+            store.messages[m["id"]] = m
         
     try:
         from ..config import settings
