@@ -134,7 +134,6 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-pip install pytest pytest-asyncio httpx
 ```
 Create a `.env` file from `.env.example` and fill in your API credentials.
 
