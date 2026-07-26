@@ -145,19 +145,19 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
     // Headings
     if (line.startsWith('# ')) {
       elements.push(
-        <h1 key={idx} className="text-base font-extrabold text-white uppercase tracking-wider mt-4 mb-2 border-b border-darkBorder pb-1.5 flex items-center gap-2">
+        <h1 key={idx} className="text-base font-extrabold text-slate-800 uppercase tracking-wider mt-4 mb-2 border-b border-darkBorder pb-1.5 flex items-center gap-2">
           {line.replace('# ', '')}
         </h1>
       );
     } else if (line.startsWith('## ')) {
       elements.push(
-        <h2 key={idx} className="text-xs font-bold text-slate-200 uppercase tracking-widest mt-5 mb-2 border-l-2 border-cyan-400 pl-2 pb-0.5">
+        <h2 key={idx} className="text-xs font-bold text-slate-700 uppercase tracking-widest mt-5 mb-2 border-l-2 border-cyan-500 pl-2 pb-0.5">
           {line.replace('## ', '')}
         </h2>
       );
     } else if (line.startsWith('### ')) {
       elements.push(
-        <h3 key={idx} className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mt-3 mb-1.5">
+        <h3 key={idx} className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-3 mb-1.5">
           {line.replace('### ', '')}
         </h3>
       );

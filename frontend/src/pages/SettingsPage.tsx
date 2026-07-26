@@ -140,25 +140,25 @@ export const SettingsPage: React.FC = () => {
   return (
     <div className="w-full max-w-5xl space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <SettingsIcon className="w-5 h-5 text-cyan-400" />
+        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <SettingsIcon className="w-5 h-5 text-cyan-500" />
           Platform Settings & System Configurations
         </h2>
-        <p className="text-xs text-slate-400">Configure Telegram Telethon Account, Local LLM Inference (Ollama), and MongoDB storage.</p>
+        <p className="text-xs text-slate-500">Configure Telegram Telethon Account, Local LLM Inference (Ollama), and MongoDB storage.</p>
       </div>
 
       {/* UNIFIED TELEGRAM & PHONE CREDENTIALS BLOCK */}
       <div className="glass-card p-6 rounded-2xl border border-telegramBlue/40 bg-gradient-to-br from-darkCard via-darkCard to-telegramBlue/10 space-y-5 shadow-xl">
         <div className="flex items-center justify-between pb-3 border-b border-darkBorder">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-telegramBlue/20 text-cyan-400 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-telegramBlue/20 text-cyan-600 flex items-center justify-center font-bold">
               <Key className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                 Telegram Telethon Credentials & Phone Authentication
               </h3>
-              <p className="text-[11px] text-slate-400">Enter API ID, API Hash, and Phone Number to send & verify Telegram OTP.</p>
+              <p className="text-[11px] text-slate-500">Enter API ID, API Hash, and Phone Number to send & verify Telegram OTP.</p>
             </div>
           </div>
 
