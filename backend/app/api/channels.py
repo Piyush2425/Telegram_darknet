@@ -422,5 +422,30 @@ async def download_live_report_pdf(channel_id: str, date: Optional[str] = None):
         filename=f"CTI_Intelligence_Report_{ch['title']}_{date_str}.pdf"
     )
 
+@router.get("/{channel_id}/url-ledger")
+async def get_channel_url_ledger(channel_id: str):
+    """Retrieve the stateful hybrid URL ledger markdown file for a channel."""
+    if channel_id not in store.channels:
+        raise HTTPException(status_code=404, detail="Channel not found")
+        
+    ch = store.channels[channel_id]
+    channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+    md_path = channel_reports_dir / "url.md"
+    
+    if not md_path.exists():
+        fallback_md = f"""# 🌐 CTI Extracted URL Ledger: {ch['title']}
+        
+_No threat links or URLs have been statefully compiled for this channel yet. Run a scrape and analysis cycle first._
+"""
+        return {"report": fallback_md, "channel_title": ch["title"]}
+        
+    try:
+        with open(md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"report": content, "channel_title": ch["title"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read URL ledger from disk: {e}")
+
+
 
 

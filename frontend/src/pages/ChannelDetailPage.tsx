@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Shield, Radio, RefreshCw, Eye, MessageSquare, Terminal, PlayCircle, Bug, Globe, AlertTriangle, Clock, Check, ArrowLeft, Calendar, RotateCcw, Cpu, Copy, X, FileText } from 'lucide-react';
-import { getChannels, getMessages, scrapeSingleChannel, getScraperStatus, scheduleChannel, generateAiReport, getLiveReport } from '../services/api';
+import { getChannels, getMessages, scrapeSingleChannel, getScraperStatus, scheduleChannel, generateAiReport, getLiveReport, getUrlLedger } from '../services/api';
 import { Channel, Message, ScraperStatus } from '../types';
 
 const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
@@ -218,9 +218,11 @@ export const ChannelDetailPage: React.FC = () => {
   const [intervalUnit, setIntervalUnit] = useState('minutes');
   
   // Tabs & Live Report State
-  const [activeTab, setActiveTab] = useState<'messages' | 'live-report'>('messages');
+  const [activeTab, setActiveTab] = useState<'messages' | 'live-report' | 'urls'>('messages');
   const [liveReportMd, setLiveReportMd] = useState<string>('');
   const [liveReportLoading, setLiveReportLoading] = useState(false);
+  const [urlLedgerMd, setUrlLedgerMd] = useState<string>('');
+  const [urlLedgerLoading, setUrlLedgerLoading] = useState(false);
   
   // AI Scheduler Form State
   const [isAutoAi, setIsAutoAi] = useState(false);
@@ -281,9 +283,24 @@ export const ChannelDetailPage: React.FC = () => {
     }
   };
 
+  const fetchUrlLedgerData = async () => {
+    if (!channelId) return;
+    setUrlLedgerLoading(true);
+    try {
+      const res = await getUrlLedger(channelId);
+      setUrlLedgerMd(res.report);
+    } catch (e) {
+      console.error("Error fetching url ledger:", e);
+    } finally {
+      setUrlLedgerLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'live-report') {
       fetchLiveReport();
+    } else if (activeTab === 'urls') {
+      fetchUrlLedgerData();
     }
   }, [activeTab, channelId]);
 
@@ -771,6 +788,18 @@ export const ChannelDetailPage: React.FC = () => {
                   <FileText className="w-3.5 h-3.5 text-indigo-400" />
                   Live daily Report (.md)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('urls')}
+                  className={`px-4 py-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+                    activeTab === 'urls'
+                      ? 'border-emerald-400 text-white bg-emerald-950/10'
+                      : 'border-transparent text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  URL & Indicator Ledger (.md)
+                </button>
               </div>
 
               {/* Action Buttons depending on Tab */}
@@ -813,7 +842,7 @@ export const ChannelDetailPage: React.FC = () => {
                     {reportLoading ? 'Analyzing...' : 'Generate AI Report'}
                   </button>
                 </div>
-              ) : (
+              ) : activeTab === 'live-report' ? (
                 <div className="flex items-center gap-2 pr-2 py-2 sm:py-0">
                   <button
                     type="button"
@@ -821,7 +850,7 @@ export const ChannelDetailPage: React.FC = () => {
                     disabled={liveReportLoading}
                     className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-800 text-slate-300 font-bold text-[10px] rounded border border-darkBorder transition-colors"
                   >
-                    <RefreshCw className={`w-3 h-3 ${liveReportLoading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${liveReportLoading ? 'animate-spin' : ''}`} />
                     Refresh Logs
                   </button>
                   <button
@@ -845,6 +874,29 @@ export const ChannelDetailPage: React.FC = () => {
                   >
                     <FileText className="w-3 h-3" />
                     Export PDF Report
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 pr-2 py-2 sm:py-0">
+                  <button
+                    type="button"
+                    onClick={fetchUrlLedgerData}
+                    disabled={urlLedgerLoading}
+                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-800 text-slate-300 font-bold text-[10px] rounded border border-darkBorder transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${urlLedgerLoading ? 'animate-spin' : ''}`} />
+                    Refresh Ledger
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(urlLedgerMd);
+                      alert("URL Ledger copied to clipboard!");
+                    }}
+                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-800 text-slate-300 font-bold text-[10px] rounded border border-darkBorder transition-colors"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copy Markdown
                   </button>
                 </div>
               )}
@@ -896,7 +948,7 @@ export const ChannelDetailPage: React.FC = () => {
                     )}
                   </tbody>
                 </table>
-              ) : (
+              ) : activeTab === 'live-report' ? (
                 <div className="p-5 font-sans text-xs text-slate-300 leading-relaxed bg-darkCard/10 select-text rounded-lg border border-darkBorder/40">
                   {liveReportLoading ? (
                     <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
@@ -905,6 +957,17 @@ export const ChannelDetailPage: React.FC = () => {
                     </div>
                   ) : (
                     <MarkdownRenderer content={liveReportMd} />
+                  )}
+                </div>
+              ) : (
+                <div className="p-5 font-sans text-xs text-slate-300 leading-relaxed bg-darkCard/10 select-text rounded-lg border border-darkBorder/40">
+                  {urlLedgerLoading ? (
+                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
+                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                      <span>Reading stateful URL ledger report...</span>
+                    </div>
+                  ) : (
+                    <MarkdownRenderer content={urlLedgerMd} />
                   )}
                 </div>
               )}

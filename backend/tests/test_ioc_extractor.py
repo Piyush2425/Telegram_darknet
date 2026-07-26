@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import pytest
 from app.llm.ioc_extractor import extract_indicators_hybrid
 from app.scrapers.scheduler import update_url_ioc_ledger

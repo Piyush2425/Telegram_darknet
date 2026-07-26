@@ -77,6 +77,11 @@ export const getLiveReport = async (channelId: string, date?: string): Promise<{
   return res.data;
 };
 
+export const getUrlLedger = async (channelId: string): Promise<{ report: string; channel_title: string }> => {
+  const res = await api.get(`/channels/${channelId}/url-ledger`);
+  return res.data;
+};
+
 
 export const scrapeSingleChannel = async (channelId: string): Promise<{ status: string }> => {
   const res = await api.post(`/channels/${channelId}/scrape`);
