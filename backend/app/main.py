@@ -76,6 +76,20 @@ app.include_router(intel_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 
+@app.get("/api/notifications")
+async def get_notifications():
+    """Retrieve running historical notifications list."""
+    from .db.mongodb import store
+    return store.notifications
+
+@app.post("/api/notifications/read-all")
+async def mark_notifications_read():
+    """Mark all notifications as read."""
+    from .db.mongodb import store
+    for n in store.notifications:
+        n["read"] = True
+    return {"status": "marked_read"}
+
 @app.get("/api/health")
 async def health_check():
     db_status = await get_db_status()

@@ -63,6 +63,9 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
         # Check if fallback was triggered and log warning to Scraper Console
         if extracted.get("fallback_triggered"):
             telegram_scraper.log(f"⚠ Local LLM Offline/Failed: {extracted.get('fallback_reason')}. Running fallback regex threat extraction.")
+            store.add_notification("warning", f"⚠ LLM Offline: Fallback CTI run for '{ch['title']}' ({len(unspent_msgs)} msgs)")
+        else:
+            store.add_notification("analysis", f"🧠 CTI daily ledger updated for '{ch['title']}' ({len(unspent_msgs)} msgs)")
         
         # Mark messages as analyzed in memory
         for m in unspent_msgs:
@@ -445,9 +448,11 @@ async def generate_auto_report_task(channel_id: str):
         }
         
         telegram_scraper.log(f"✓ Final Daily PDF Report compiled successfully: data/{channel_id}/reports/{pdf_path.name}")
+        store.add_notification("report", f"📄 PDF Report compiled for '{ch['title']}'")
     except Exception as e:
         logger.error(f"Error compiling daily PDF report: {e}")
         telegram_scraper.log(f"⚠ PDF Report compilation failed: {e}")
+        store.add_notification("error", f"⚠ PDF compilation failed for '{ch['title']}': {e}")
 
 async def scrape_channel_silent(channel_id: str):
     """Scrapes a channel silently and appends raw transcripts to the daily log."""

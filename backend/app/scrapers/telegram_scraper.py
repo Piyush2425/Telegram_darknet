@@ -506,6 +506,7 @@ class TelegramScraper:
                             # Store channel-wise CSV in backend (de-duplicated)
                             if scraped_from_channel:
                                 self._write_messages_to_csv(ch_id, scraped_from_channel)
+                                store.add_notification("scrape", f"✓ Scraped {len(scraped_from_channel)} new messages from '{self.current_channel}'")
 
 
                         except Exception as e:

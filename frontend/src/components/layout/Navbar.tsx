@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Shield, Radio, Bell, RefreshCw, PlayCircle } from 'lucide-react';
-import { syncTelegramChannels, startScraping } from '../../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { Shield, Radio, Bell, RefreshCw, PlayCircle, Cpu, FileText, AlertTriangle, XCircle, Check } from 'lucide-react';
+import { syncTelegramChannels, startScraping, getNotifications, markNotificationsRead } from '../../services/api';
 
 interface NavbarProps {
   isScraping: boolean;
@@ -8,6 +8,35 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
   const [syncing, setSyncing] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifs = async () => {
+    try {
+      const data = await getNotifications();
+      setNotifications(data);
+    } catch (e) {
+      console.error("Notifications fetch error:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -26,6 +55,34 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
       await startScraping();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const renderNotifIcon = (type: string) => {
+    switch (type) {
+      case 'scrape':
+        return <Radio className="w-3.5 h-3.5 text-cyan-400" />;
+      case 'analysis':
+        return <Cpu className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'report':
+        return <FileText className="w-3.5 h-3.5 text-blue-400" />;
+      case 'warning':
+        return <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />;
+      case 'error':
+        return <XCircle className="w-3.5 h-3.5 text-rose-400" />;
+      default:
+        return <Bell className="w-3.5 h-3.5 text-slate-400" />;
     }
   };
 
@@ -74,10 +131,67 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
 
         <div className="w-px h-6 bg-darkBorder" />
 
-        <div className="flex items-center gap-3">
-          <button className="p-1.5 rounded-lg text-slate-400 hover:text-white transition-colors relative">
+        <div className="flex items-center gap-3 relative" ref={dropdownRef}>
+          {/* Bell Icon Trigger */}
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className={`p-1.5 rounded-lg transition-colors relative hover:bg-darkBg ${dropdownOpen ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+          >
             <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center rounded-full animate-bounce">
+                {unreadCount}
+              </span>
+            )}
           </button>
+
+          {/* Notifications Dropdown Panel */}
+          {dropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 glass-card rounded-xl border border-darkBorder/60 shadow-2xl p-4 space-y-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between border-b border-darkBorder/50 pb-2">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Bell className="w-3.5 h-3.5 text-cyan-400" />
+                  Notifications logs
+                </span>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+                  >
+                    <Check className="w-3 h-3" />
+                    Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+                {notifications.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 text-xs">
+                    No notifications logged today.
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`p-2.5 rounded-lg border text-xs flex items-start gap-2.5 transition-all ${
+                        notif.read
+                          ? 'bg-transparent border-darkBorder/30 text-slate-400'
+                          : 'bg-blue-500/5 border-blue-500/20 text-slate-200 shadow-sm'
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0 bg-darkBg/60 p-1 rounded-md border border-darkBorder/40">
+                        {renderNotifIcon(notif.type)}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="leading-relaxed text-[11px] font-mono break-words">{notif.message}</p>
+                        <span className="block text-[9px] text-slate-500 font-medium">{notif.timestamp} IST</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="w-8 h-8 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold text-xs shadow-md">
             CT

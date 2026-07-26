@@ -139,4 +139,14 @@ export const verifyTelegramOtpCode = async (
   return res.data;
 };
 
+export const getNotifications = async (): Promise<any[]> => {
+  const res = await api.get('/notifications');
+  return res.data;
+};
+
+export const markNotificationsRead = async (): Promise<{ status: string }> => {
+  const res = await api.post('/notifications/read-all');
+  return res.data;
+};
+
 export default api;

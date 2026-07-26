@@ -11,6 +11,22 @@ class InMemoryStore:
         self.messages: Dict[str, dict] = {}
         self.threat_intel: Dict[str, dict] = {}
         self.reports: Dict[str, dict] = {}
+        self.notifications: List[dict] = []
+
+    def add_notification(self, type_str: str, message: str):
+        import datetime
+        from datetime import timezone, timedelta
+        IST = timezone(timedelta(hours=5, minutes=30))
+        now_str = datetime.datetime.now(IST).strftime("%H:%M:%S")
+        self.notifications.insert(0, {
+            "id": f"notif_{len(self.notifications) + 1}",
+            "timestamp": now_str,
+            "type": type_str,
+            "message": message,
+            "read": False
+        })
+        if len(self.notifications) > 50:
+            self.notifications = self.notifications[:50]
 
 store = InMemoryStore()
 
