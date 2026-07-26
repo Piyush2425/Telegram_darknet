@@ -16,6 +16,109 @@ def append_raw_chats_to_daily_log(channel_id: str, channel_title: str, messages:
     """Placeholder to maintain daily running transcript log logic without double-logging."""
     pass
 
+async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_messages: list, reports_dir):
+    """
+    Extracts URLs/domains/IPs/emails statefully from new messages using the hybrid pipeline,
+    saves the list to url.state.json, and generates url.md.
+    """
+    from ..llm.ioc_extractor import extract_indicators_hybrid
+    from pathlib import Path
+    
+    state_path = Path(reports_dir) / "url.state.json"
+    md_path = Path(reports_dir) / "url.md"
+    
+    url_state = {"indicators": []}
+    if state_path.exists():
+        try:
+            with open(state_path, "r", encoding="utf-8") as rf:
+                url_state = json.load(rf)
+        except Exception as e:
+            logger.error(f"Error reading url.state.json: {e}")
+            
+    now_time_str = datetime.now(IST).strftime("%H:%M:%S IST")
+    
+    # Process new messages
+    for m in new_messages:
+        text = m.get("text", "")
+        if not text:
+            continue
+        try:
+            found = extract_indicators_hybrid(text)
+            for item in found:
+                # Merge into stateful array
+                match = None
+                for exist in url_state["indicators"]:
+                    if exist["value"].lower() == item["value"].lower():
+                        match = exist
+                        break
+                
+                if match:
+                    match["count"] = match.get("count", 1) + 1
+                    match["last_seen"] = now_time_str
+                else:
+                    url_state["indicators"].append({
+                        "value": item["value"],
+                        "normalized": item["normalized"],
+                        "type": item["type"],
+                        "count": 1,
+                        "last_seen": now_time_str
+                    })
+        except Exception as e:
+            logger.error(f"Error parsing hybrid indicators for msg {m.get('id')}: {e}")
+            
+    # Save JSON state
+    try:
+        with open(state_path, "w", encoding="utf-8") as wf:
+            json.dump(url_state, wf, indent=2)
+    except Exception as e:
+        logger.error(f"Error writing url.state.json: {e}")
+        
+    # Compile markdown ledger report
+    indicators = url_state["indicators"]
+    count_web_urls = sum(1 for x in indicators if x["type"] == "Web URL")
+    count_onions = sum(1 for x in indicators if x["type"] == "Onion")
+    count_bare_domains = sum(1 for x in indicators if x["type"] == "Bare Domain")
+    count_emails = sum(1 for x in indicators if x["type"] == "Email")
+    count_ips = sum(1 for x in indicators if x["type"] == "IP")
+    
+    md_lines = [
+        f"# 🌐 Cyber Threat Intelligence URL Ledger: {channel_title}",
+        "",
+        "This file contains a stateful historical record of all URLs, onion links, emails, bare domains, and IP addresses extracted from messages in this channel using a hybrid pipeline (urlextract, tldextract, and custom regex).",
+        "",
+        "## 📈 Summary Statistics",
+        f"- **Total Unique Indicators:** {len(indicators)}",
+        f"- **Web URLs:** {count_web_urls}",
+        f"- **Onion Links:** {count_onions}",
+        f"- **Bare Domains:** {count_bare_domains}",
+        f"- **Emails:** {count_emails}",
+        f"- **IP Addresses:** {count_ips}",
+        "",
+        "## 🔗 Extracted Indicators Ledger",
+        "",
+        "| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |",
+        "| :--- | :--- | :--- | :--- | :--- |"
+    ]
+    
+    # Sort indicators by count descending for better CTI focus
+    sorted_indicators = sorted(indicators, key=lambda x: x.get("count", 1), reverse=True)
+    for ind in sorted_indicators:
+        val = ind["value"]
+        # Format links cleanly if it's web URL, otherwise format as inline code
+        if ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://")):
+            val_display = f"[{val}]({val})"
+        else:
+            val_display = f"`{val}`"
+            
+        md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
+        
+    try:
+        with open(md_path, "w", encoding="utf-8") as wf:
+            wf.write("\n".join(md_lines))
+        telegram_scraper.log(f"✓ Stateful URL Ledger updated: data/{channel_id}/reports/url.md")
+    except Exception as e:
+        logger.error(f"Error compiling url.md: {e}")
+
 async def run_mini_ai_analysis_cycle(channel_id: str):
     """Run an incremental AI analysis cycle, statefully updating daily JSON database and compiling the clean markdown report ledger."""
     ch = store.channels.get(channel_id)
@@ -270,6 +373,9 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
                 "event": f"[{alert['severity']}] {alert['title']} - {alert['description']}"
             })
             
+        # Update stateful URL and indicator ledger
+        await update_url_ioc_ledger(channel_id, ch["title"], unspent_msgs, channel_reports_dir)
+        
         # Save daily state database JSON
         with open(state_path, "w", encoding="utf-8") as wf:
             json.dump(state, wf, indent=2)
