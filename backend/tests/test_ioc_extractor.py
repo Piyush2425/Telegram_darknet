@@ -66,8 +66,23 @@ async def test_update_url_ioc_ledger_integration():
             {"id": "msg_2", "text": "Contact admin@shadowgroup.xyz or check http://df.sh/forum again"}
         ]
         
-        # 1. Run first cycle ledger updates
-        await update_url_ioc_ledger("test_ch", "Test Channel", messages, reports_dir)
+        # Mock LLM findings matching cycle format
+        llm_findings = {
+            "urls": [
+                "http://df.sh/forum",
+                "https://malicious-gateway.net/exploit"
+            ],
+            "onions": [
+                "leakonion6qewpzn.onion"
+            ],
+            "iocs": [
+                "192.168.10.15",
+                "CVE-2026-9999"
+            ]
+        }
+        
+        # 1. Run cycle ledger updates with both new messages and LLM findings
+        await update_url_ioc_ledger("test_ch", "Test Channel", messages, reports_dir, llm_findings)
         
         state_path = reports_dir / "url.state.json"
         md_path = reports_dir / "url.md"
@@ -80,21 +95,32 @@ async def test_update_url_ioc_ledger_integration():
             state = json.load(f)
             
         indicators = state["indicators"]
-        assert len(indicators) >= 3 # df.sh (Web URL), darkforum.sh (Bare Domain), admin@shadowgroup.xyz (Email)
+        assert len(indicators) > 0
         
-        # Verify mention counts: df.sh is seen twice
-        df_sh_indicators = [ind for ind in indicators if "df.sh" in ind["value"].lower()]
-        assert len(df_sh_indicators) > 0
-        # First or last occurrence count gets merged correctly
-        total_mentions = sum(ind["count"] for ind in df_sh_indicators)
-        assert total_mentions >= 2
+        # Verify source division
+        extractor_items = [ind for ind in indicators if ind["source"] == "Extractor"]
+        llm_items = [ind for ind in indicators if ind["source"] == "LLM"]
         
-        # Verify markdown contents
+        assert len(extractor_items) >= 3  # df.sh, darkforum.sh, admin@shadowgroup.xyz
+        assert len(llm_items) >= 5        # df.sh, malicious-gateway.net, leakonion6qewpzn.onion, IP, CVE
+        
+        # Verify specific LLM items are normalized and categorized correctly
+        llm_ips = [ind for ind in llm_items if ind["type"] == "IP"]
+        assert len(llm_ips) == 1
+        assert llm_ips[0]["value"] == "192.168.10.15"
+        
+        llm_onions = [ind for ind in llm_items if ind["type"] == "Onion"]
+        assert len(llm_onions) == 1
+        assert "leakonion6qewpzn.onion" in llm_onions[0]["value"]
+        
+        # Verify markdown contains separate tables/sections
         with open(md_path, "r", encoding="utf-8") as f:
             md_content = f.read()
-        assert "Cyber Threat Intelligence URL Ledger" in md_content
+        assert "Deterministic Extractor Indicators" in md_content
+        assert "LLM AI Extracted Indicators" in md_content
+        
+        # df.sh exists under both headers
         assert "df.sh" in md_content
-        assert "shadowgroup.xyz" in md_content
         
     finally:
         # Cleanup

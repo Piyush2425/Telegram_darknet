@@ -16,13 +16,15 @@ def append_raw_chats_to_daily_log(channel_id: str, channel_title: str, messages:
     """Placeholder to maintain daily running transcript log logic without double-logging."""
     pass
 
-async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_messages: list, reports_dir):
+async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_messages: list, reports_dir, llm_extracted_data: dict = None):
     """
-    Extracts URLs/domains/IPs/emails statefully from new messages using the hybrid pipeline,
-    saves the list to url.state.json, and generates url.md.
+    Extracts URLs/domains/IPs/emails statefully from new messages (via custom extractor)
+    and merges LLM-flagged URLs/onions/IOCs, separating them by source in url.state.json and url.md.
     """
     from ..llm.ioc_extractor import extract_indicators_hybrid
     from pathlib import Path
+    import tldextract
+    import re
     
     state_path = Path(reports_dir) / "url.state.json"
     md_path = Path(reports_dir) / "url.md"
@@ -37,7 +39,37 @@ async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_message
             
     now_time_str = datetime.now(IST).strftime("%H:%M:%S IST")
     
-    # Process new messages
+    # Ensure backwards compatibility for legacy JSON files missing the 'source' key
+    for ind in url_state["indicators"]:
+        if "source" not in ind:
+            ind["source"] = "Extractor"
+
+    # Helper function to merge an indicator statefully
+    def merge_indicator(val: str, norm: str, type_str: str, source_str: str):
+        val_clean = val.strip().strip(".,;:?!()[]{}'\"")
+        if not val_clean:
+            return
+        
+        match = None
+        for exist in url_state["indicators"]:
+            if exist["value"].lower() == val_clean.lower() and exist.get("source", "Extractor").lower() == source_str.lower():
+                match = exist
+                break
+                
+        if match:
+            match["count"] = match.get("count", 1) + 1
+            match["last_seen"] = now_time_str
+        else:
+            url_state["indicators"].append({
+                "value": val_clean,
+                "normalized": norm,
+                "type": type_str,
+                "source": source_str,
+                "count": 1,
+                "last_seen": now_time_str
+            })
+
+    # 1. Merge Extractor Indicators from messages
     for m in new_messages:
         text = m.get("text", "")
         if not text:
@@ -45,27 +77,55 @@ async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_message
         try:
             found = extract_indicators_hybrid(text)
             for item in found:
-                # Merge into stateful array
-                match = None
-                for exist in url_state["indicators"]:
-                    if exist["value"].lower() == item["value"].lower():
-                        match = exist
-                        break
-                
-                if match:
-                    match["count"] = match.get("count", 1) + 1
-                    match["last_seen"] = now_time_str
-                else:
-                    url_state["indicators"].append({
-                        "value": item["value"],
-                        "normalized": item["normalized"],
-                        "type": item["type"],
-                        "count": 1,
-                        "last_seen": now_time_str
-                    })
+                merge_indicator(item["value"], item["normalized"], item["type"], "Extractor")
         except Exception as e:
             logger.error(f"Error parsing hybrid indicators for msg {m.get('id')}: {e}")
-            
+
+    # 2. Merge LLM-extracted Indicators (from AI analysis cycle data)
+    if llm_extracted_data:
+        # Standard URLs
+        raw_urls = llm_extracted_data.get("urls") or []
+        for item in raw_urls:
+            url_val = item if isinstance(item, str) else (item.get("url") or item.get("link") if isinstance(item, dict) else "")
+            if url_val:
+                ext = tldextract.extract(url_val)
+                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else url_val
+                type_lbl = "Onion" if ".onion" in url_val.lower() else "Web URL"
+                merge_indicator(url_val, norm, type_lbl, "LLM")
+                
+        # Onion links
+        raw_onions = llm_extracted_data.get("onions") or []
+        for item in raw_onions:
+            onion_val = item if isinstance(item, str) else (item.get("url") or item.get("link") or item.get("onion") if isinstance(item, dict) else "")
+            if onion_val:
+                ext = tldextract.extract(onion_val)
+                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else "onion"
+                merge_indicator(onion_val, norm, "Onion", "LLM")
+
+        # IOCs
+        raw_iocs = llm_extracted_data.get("iocs") or []
+        for item in raw_iocs:
+            ioc_val = item if isinstance(item, str) else (item.get("value") or item.get("indicator") if isinstance(item, dict) else "")
+            if ioc_val:
+                # Guess type
+                ext = tldextract.extract(ioc_val)
+                norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else ioc_val
+                
+                type_lbl = "Bare Domain"
+                if "@" in ioc_val:
+                    type_lbl = "Email"
+                    norm = ioc_val.split("@")[-1]
+                elif re.match(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", ioc_val):
+                    type_lbl = "IP"
+                    norm = ioc_val
+                elif ".onion" in ioc_val.lower():
+                    type_lbl = "Onion"
+                    norm = f"{ext.domain}.{ext.suffix}" if (ext.domain and ext.suffix) else "onion"
+                elif "cve-" in ioc_val.lower():
+                    type_lbl = "Bare Domain"
+                    
+                merge_indicator(ioc_val, norm, type_lbl, "LLM")
+
     # Save JSON state
     try:
         with open(state_path, "w", encoding="utf-8") as wf:
@@ -75,42 +135,49 @@ async def update_url_ioc_ledger(channel_id: str, channel_title: str, new_message
         
     # Compile markdown ledger report
     indicators = url_state["indicators"]
-    count_web_urls = sum(1 for x in indicators if x["type"] == "Web URL")
-    count_onions = sum(1 for x in indicators if x["type"] == "Onion")
-    count_bare_domains = sum(1 for x in indicators if x["type"] == "Bare Domain")
-    count_emails = sum(1 for x in indicators if x["type"] == "Email")
-    count_ips = sum(1 for x in indicators if x["type"] == "IP")
+    extractor_list = [x for x in indicators if x.get("source", "Extractor") == "Extractor"]
+    llm_list = [x for x in indicators if x.get("source", "Extractor") == "LLM"]
     
     md_lines = [
         f"# 🌐 Cyber Threat Intelligence URL Ledger: {channel_title}",
         "",
-        "This file contains a stateful historical record of all URLs, onion links, emails, bare domains, and IP addresses extracted from messages in this channel using a hybrid pipeline (urlextract, tldextract, and custom regex).",
+        "This file contains a stateful historical record of all URLs, onion links, emails, bare domains, and IP addresses extracted from this channel.",
+        "It partitions indicators into deterministic matches found by the automated scraping parser (Extractor) and cognitive matches flagged by the local LLM model (LLM).",
         "",
         "## 📈 Summary Statistics",
-        f"- **Total Unique Indicators:** {len(indicators)}",
-        f"- **Web URLs:** {count_web_urls}",
-        f"- **Onion Links:** {count_onions}",
-        f"- **Bare Domains:** {count_bare_domains}",
-        f"- **Emails:** {count_emails}",
-        f"- **IP Addresses:** {count_ips}",
+        f"- **Total Unique Extractor Indicators:** {len(extractor_list)}",
+        f"- **Total Unique LLM Indicators:** {len(llm_list)}",
         "",
-        "## 🔗 Extracted Indicators Ledger",
-        "",
-        "| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |",
-        "| :--- | :--- | :--- | :--- | :--- |"
+        "## 🔗 1. Deterministic Extractor Indicators",
+        ""
     ]
     
-    # Sort indicators by count descending for better CTI focus
-    sorted_indicators = sorted(indicators, key=lambda x: x.get("count", 1), reverse=True)
-    for ind in sorted_indicators:
-        val = ind["value"]
-        # Format links cleanly if it's web URL, otherwise format as inline code
-        if ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://")):
-            val_display = f"[{val}]({val})"
-        else:
-            val_display = f"`{val}`"
-            
-        md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
+    if extractor_list:
+        md_lines.append("| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |")
+        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        # Sort by mention count desc
+        sorted_ext = sorted(extractor_list, key=lambda x: x.get("count", 1), reverse=True)
+        for ind in sorted_ext:
+            val = ind["value"]
+            val_display = f"[{val}]({val})" if (ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://"))) else f"`{val}`"
+            md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
+    else:
+        md_lines.append("_No automated extractor indicators collected yet._")
+        
+    md_lines.append("\n## 🧠 2. LLM AI Extracted Indicators")
+    md_lines.append("")
+    
+    if llm_list:
+        md_lines.append("| Indicator Value | Normalized Domain/TLD | Type | Mention Count | Last Seen (IST) |")
+        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        # Sort by count desc
+        sorted_llm = sorted(llm_list, key=lambda x: x.get("count", 1), reverse=True)
+        for ind in sorted_llm:
+            val = ind["value"]
+            val_display = f"[{val}]({val})" if (ind["type"] == "Web URL" and (val.startswith("http://") or val.startswith("https://"))) else f"`{val}`"
+            md_lines.append(f"| {val_display} | `{ind['normalized']}` | {ind['type']} | {ind['count']} | {ind['last_seen']} |")
+    else:
+        md_lines.append("_No cognitive LLM indicators flagged yet._")
         
     try:
         with open(md_path, "w", encoding="utf-8") as wf:
@@ -374,7 +441,7 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
             })
             
         # Update stateful URL and indicator ledger
-        await update_url_ioc_ledger(channel_id, ch["title"], unspent_msgs, channel_reports_dir)
+        await update_url_ioc_ledger(channel_id, ch["title"], unspent_msgs, channel_reports_dir, extracted)
         
         # Save daily state database JSON
         with open(state_path, "w", encoding="utf-8") as wf:
