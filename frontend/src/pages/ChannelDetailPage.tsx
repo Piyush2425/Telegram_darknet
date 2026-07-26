@@ -462,25 +462,25 @@ export const ChannelDetailPage: React.FC = () => {
         </button>
 
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wide">
+          <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
             Target Page Intelligence Console
           </h2>
         </div>
       </div>
 
       {/* 2. Channel Metadata Block (Super Compact) */}
-      <div className="glass-card p-4 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/20 to-blue-950/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 mb-3">
+      <div className="glass-card p-4 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-50/40 to-blue-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full bg-cyan-600/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center font-bold text-sm shadow-inner">
+          <div className="w-11 h-11 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 flex items-center justify-center font-bold text-sm shadow-inner">
             {channel.title.substring(0, 2).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2 leading-none">
+            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
               {channel.title}
               <span className="text-[10px] text-slate-500 font-mono">ID: {channel.id}</span>
             </h2>
-            <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1">
-              <span className="font-mono text-cyan-400 font-bold">{channel.username}</span>
+            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-1">
+              <span className="font-mono text-cyan-600 font-bold">{channel.username}</span>
               <span>•</span>
               <span>Type: {channel.type || 'Channel'}</span>
             </div>
@@ -489,12 +489,12 @@ export const ChannelDetailPage: React.FC = () => {
 
         <div className="flex items-center gap-4 text-xs font-semibold">
           <div className="text-right">
-            <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider leading-none">Subscribers</div>
-            <div className="text-sm font-bold text-white mt-0.5">{channel.member_count.toLocaleString()}</div>
+            <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider leading-none">Subscribers</div>
+            <div className="text-sm font-bold text-slate-800 mt-0.5">{channel.member_count.toLocaleString()}</div>
           </div>
           <div className="text-right border-l border-darkBorder pl-4">
-            <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider leading-none">Scraped Posts</div>
-            <div className="text-sm font-bold text-cyan-400 mt-0.5">{messages.length}</div>
+            <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider leading-none">Scraped Posts</div>
+            <div className="text-sm font-bold text-cyan-600 mt-0.5">{messages.length}</div>
           </div>
           
           <button
@@ -531,7 +531,7 @@ export const ChannelDetailPage: React.FC = () => {
         <div className="lg:col-span-3 flex flex-col gap-4 min-h-0">
           
           {/* Unified Schedulers Panel (Three columns layout: Scraper, AI Cycles, and PDF Schedulers) */}
-          <div className="glass-card p-4 rounded-xl border border-cyan-500/20 bg-darkCard/40 shrink-0">
+          <div className="glass-card p-4 rounded-xl border border-cyan-500/20 bg-darkCard shrink-0">
             <form onSubmit={handleUpdateSchedule} className="space-y-3.5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
@@ -539,15 +539,15 @@ export const ChannelDetailPage: React.FC = () => {
                 <div className="space-y-2 border-r border-darkBorder/30 pr-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Auto-Scrape Schedule</span>
+                      <Clock className="w-4 h-4 text-cyan-600" />
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Auto-Scrape Schedule</span>
                     </div>
                     {channel.is_auto_monitoring ? (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                         Active
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-800 text-slate-500">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
                         Off
                       </span>
                     )}
@@ -559,14 +559,14 @@ export const ChannelDetailPage: React.FC = () => {
                         type="button"
                         onClick={() => setIsAutoMonitoring(!isAutoMonitoring)}
                         className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none ${
-                          isAutoMonitoring ? 'bg-blue-600' : 'bg-slate-700'
+                          isAutoMonitoring ? 'bg-blue-600' : 'bg-slate-300'
                         }`}
                       >
                         <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
                           isAutoMonitoring ? 'translate-x-4' : 'translate-x-0'
                         }`} />
                       </button>
-                      <span className="text-[11px] font-bold text-slate-400">Enable</span>
+                      <span className="text-[11px] font-bold text-slate-500">Enable</span>
                     </div>
 
                     {isAutoMonitoring && (
@@ -576,12 +576,12 @@ export const ChannelDetailPage: React.FC = () => {
                           min="1"
                           value={intervalVal}
                           onChange={(e) => setIntervalVal(parseInt(e.target.value) || 1)}
-                          className="w-14 bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
+                          className="w-14 bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
                         />
                         <select
                           value={intervalUnit}
                           onChange={(e) => setIntervalUnit(e.target.value)}
-                          className="bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
+                          className="bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
                         >
                           <option value="minutes">Min</option>
                           <option value="hours">Hours</option>
@@ -591,8 +591,8 @@ export const ChannelDetailPage: React.FC = () => {
                   </div>
                   
                   {channel.is_auto_monitoring && channel.next_scrape_at && (
-                    <div className="text-[10px] text-slate-400">
-                      Next Scrape: <span className="font-bold text-slate-200">{new Date(channel.next_scrape_at).toLocaleString()}</span>
+                    <div className="text-[10px] text-slate-500">
+                      Next Scrape: <span className="font-bold text-slate-700">{new Date(channel.next_scrape_at).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
@@ -601,15 +601,15 @@ export const ChannelDetailPage: React.FC = () => {
                 <div className="space-y-2 border-r border-darkBorder/30 pr-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Cpu className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Auto-AI Cycles Schedule</span>
+                      <Cpu className="w-4 h-4 text-cyan-600" />
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Auto-AI Cycles Schedule</span>
                     </div>
                     {channel.is_auto_ai ? (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
                         Active
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-800 text-slate-500">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
                         Off
                       </span>
                     )}
@@ -621,14 +621,14 @@ export const ChannelDetailPage: React.FC = () => {
                         type="button"
                         onClick={() => setIsAutoAi(!isAutoAi)}
                         className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none ${
-                          isAutoAi ? 'bg-indigo-600' : 'bg-slate-700'
+                          isAutoAi ? 'bg-indigo-600' : 'bg-slate-300'
                         }`}
                       >
                         <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
                           isAutoAi ? 'translate-x-4' : 'translate-x-0'
                         }`} />
                       </button>
-                      <span className="text-[11px] font-bold text-slate-400">Enable</span>
+                      <span className="text-[11px] font-bold text-slate-500">Enable</span>
                     </div>
 
                     {isAutoAi && (
@@ -638,12 +638,12 @@ export const ChannelDetailPage: React.FC = () => {
                           min="1"
                           value={aiIntervalVal}
                           onChange={(e) => setAiIntervalVal(parseInt(e.target.value) || 1)}
-                          className="w-14 bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
+                          className="w-14 bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
                         />
                         <select
                           value={aiIntervalUnit}
                           onChange={(e) => setAiIntervalUnit(e.target.value)}
-                          className="bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
+                          className="bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
                         >
                           <option value="minutes">Min</option>
                           <option value="hours">Hours</option>
@@ -654,8 +654,8 @@ export const ChannelDetailPage: React.FC = () => {
                   </div>
                   
                   {channel.is_auto_ai && channel.next_ai_at && (
-                    <div className="text-[10px] text-slate-400">
-                      Next AI Cycle: <span className="font-bold text-slate-200">{new Date(channel.next_ai_at).toLocaleString()}</span>
+                    <div className="text-[10px] text-slate-500">
+                      Next AI Cycle: <span className="font-bold text-slate-700">{new Date(channel.next_ai_at).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
@@ -664,15 +664,15 @@ export const ChannelDetailPage: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Auto-Report PDF Compiler</span>
+                      <FileText className="w-4 h-4 text-cyan-600" />
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Auto-Report PDF Compiler</span>
                     </div>
                     {channel.is_auto_report ? (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
                         Active
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-800 text-slate-500">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
                         Off
                       </span>
                     )}
@@ -684,14 +684,14 @@ export const ChannelDetailPage: React.FC = () => {
                         type="button"
                         onClick={() => setIsAutoReport(!isAutoReport)}
                         className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none ${
-                          isAutoReport ? 'bg-rose-600' : 'bg-slate-700'
+                          isAutoReport ? 'bg-rose-600' : 'bg-slate-300'
                         }`}
                       >
                         <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
                           isAutoReport ? 'translate-x-4' : 'translate-x-0'
                         }`} />
                       </button>
-                      <span className="text-[11px] font-bold text-slate-400">Enable</span>
+                      <span className="text-[11px] font-bold text-slate-500">Enable</span>
                     </div>
 
                     {isAutoReport && (
@@ -701,12 +701,12 @@ export const ChannelDetailPage: React.FC = () => {
                           min="1"
                           value={reportIntervalVal}
                           onChange={(e) => setReportIntervalVal(parseInt(e.target.value) || 1)}
-                          className="w-14 bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
+                          className="w-14 bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder text-center focus:outline-none"
                         />
                         <select
                           value={reportIntervalUnit}
                           onChange={(e) => setReportIntervalUnit(e.target.value)}
-                          className="bg-darkBg text-xs text-white px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
+                          className="bg-darkBg text-xs text-slate-800 px-2 py-1 rounded border border-darkBorder focus:outline-none cursor-pointer"
                         >
                           <option value="minutes">Min</option>
                           <option value="hours">Hours</option>
@@ -717,8 +717,8 @@ export const ChannelDetailPage: React.FC = () => {
                   </div>
                   
                   {channel.is_auto_report && channel.next_report_at && (
-                    <div className="text-[10px] text-slate-400">
-                      Next PDF Report: <span className="font-bold text-slate-200">{new Date(channel.next_report_at).toLocaleString()}</span>
+                    <div className="text-[10px] text-slate-500">
+                      Next PDF Report: <span className="font-bold text-slate-700">{new Date(channel.next_report_at).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
@@ -728,14 +728,14 @@ export const ChannelDetailPage: React.FC = () => {
               <div className="flex items-center justify-between pt-2 border-t border-darkBorder/30">
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-darkBg font-bold text-xs rounded-lg transition-all"
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition-all"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Apply Scheduler Rules
                 </button>
 
                 {schedulerSaved && (
-                  <span className="text-[11px] text-emerald-400 font-bold">✓ Scheduler rules updated successfully!</span>
+                  <span className="text-[11px] text-emerald-600 font-bold">✓ Scheduler rules updated successfully!</span>
                 )}
               </div>
             </form>
@@ -745,18 +745,18 @@ export const ChannelDetailPage: React.FC = () => {
           <div className="flex-1 flex flex-col min-h-0 bg-darkCard border border-darkBorder rounded-xl overflow-hidden">
             
             {/* Tabs Header */}
-            <div className="flex border-b border-darkBorder bg-darkCard/50 justify-between items-center shrink-0 px-2 flex-wrap">
+            <div className="flex border-b border-darkBorder bg-darkCard justify-between items-center shrink-0 px-2 flex-wrap">
               <div className="flex">
                 <button
                   type="button"
                   onClick={() => setActiveTab('messages')}
                   className={`px-4 py-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
                     activeTab === 'messages'
-                      ? 'border-cyan-400 text-white bg-cyan-950/10'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-cyan-500 text-cyan-600 bg-cyan-500/5'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                  <MessageSquare className="w-3.5 h-3.5 text-cyan-500" />
                   Message Log Directory
                 </button>
                 <button
@@ -764,42 +764,42 @@ export const ChannelDetailPage: React.FC = () => {
                   onClick={() => setActiveTab('live-report')}
                   className={`px-4 py-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
                     activeTab === 'live-report'
-                      ? 'border-indigo-400 text-white bg-indigo-950/10'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-indigo-500 text-indigo-600 bg-indigo-500/5'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                  <FileText className="w-3.5 h-3.5 text-indigo-500" />
                   Live daily Report (.md)
                 </button>
               </div>
 
               {/* Action Buttons depending on Tab */}
               {activeTab === 'messages' ? (
-                <div className="flex items-center gap-3 pr-2 text-[11px] text-slate-400 py-2 sm:py-0">
+                <div className="flex items-center gap-3 pr-2 text-[11px] text-slate-500 py-2 sm:py-0">
                   <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                    <Calendar className="w-3.5 h-3.5 text-cyan-500" />
                     <span className="font-bold">Select Range:</span>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-darkBg text-slate-200 text-xs px-2 py-0.5 rounded border border-darkBorder focus:outline-none"
+                      className="bg-darkBg text-slate-700 text-xs px-2 py-0.5 rounded border border-darkBorder focus:outline-none"
                     />
                     <span>to</span>
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-darkBg text-slate-200 text-xs px-2 py-0.5 rounded border border-darkBorder focus:outline-none"
+                      className="bg-darkBg text-slate-700 text-xs px-2 py-0.5 rounded border border-darkBorder focus:outline-none"
                     />
                     {(startDate || endDate) && (
                       <button
                         type="button"
                         onClick={handleResetDates}
-                        className="p-1 hover:text-white rounded bg-darkBorder transition-colors"
+                        className="p-1 hover:text-slate-800 rounded bg-slate-100 transition-colors"
                         title="Reset date filter"
                       >
-                        <RotateCcw className="w-3 h-3 text-slate-400 hover:text-white" />
+                        <RotateCcw className="w-3 h-3 text-slate-500 hover:text-slate-800" />
                       </button>
                     )}
                   </div>
@@ -819,7 +819,7 @@ export const ChannelDetailPage: React.FC = () => {
                     type="button"
                     onClick={fetchLiveReport}
                     disabled={liveReportLoading}
-                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-800 text-slate-300 font-bold text-[10px] rounded border border-darkBorder transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-100 text-slate-600 font-bold text-[10px] rounded border border-darkBorder transition-colors"
                   >
                     <RefreshCw className={`w-3 h-3 ${liveReportLoading ? 'animate-spin' : ''}`} />
                     Refresh Logs
@@ -830,7 +830,7 @@ export const ChannelDetailPage: React.FC = () => {
                       navigator.clipboard.writeText(liveReportMd);
                       alert("Markdown daily log report copied to clipboard!");
                     }}
-                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-800 text-slate-300 font-bold text-[10px] rounded border border-darkBorder transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 bg-darkBg hover:bg-slate-100 text-slate-600 font-bold text-[10px] rounded border border-darkBorder transition-colors"
                   >
                     <Copy className="w-3 h-3" />
                     Copy Markdown
@@ -855,7 +855,7 @@ export const ChannelDetailPage: React.FC = () => {
               {activeTab === 'messages' ? (
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="bg-darkCard/80 border-b border-darkBorder text-[9px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                    <tr className="bg-slate-100 border-b border-darkBorder text-[9px] font-bold text-slate-600 uppercase tracking-wider sticky top-0 z-10">
                       <th className="py-2.5 px-4 w-36">SENDER (USER ID)</th>
                       <th className="py-2.5 px-4 w-44">DATE & TIME</th>
                       <th className="py-2.5 px-4">MESSAGE TEXT</th>
@@ -863,25 +863,25 @@ export const ChannelDetailPage: React.FC = () => {
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-darkBorder/40 text-[11px] text-slate-300">
+                  <tbody className="divide-y divide-darkBorder/40 text-[11px] text-slate-600">
                     {filteredMessages.map((msg) => (
-                      <tr key={msg.id} className="hover:bg-darkCard/20 transition-colors">
-                        <td className="py-3 px-4 font-mono text-cyan-400 font-bold break-all">
+                      <tr key={msg.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 font-mono text-cyan-600 font-bold break-all">
                           {msg.sender}
                         </td>
 
-                        <td className="py-3 px-4 text-slate-400">
+                        <td className="py-3 px-4 text-slate-500">
                           {new Date(msg.date).toLocaleString()}
                         </td>
 
                         <td className="py-3 px-4 space-y-1">
-                          <div className="text-slate-200 font-mono whitespace-pre-wrap bg-darkBg/30 p-2 rounded border border-white/5 break-words select-all max-h-36 overflow-y-auto leading-relaxed">
+                          <div className="text-slate-700 font-mono whitespace-pre-wrap bg-slate-100 p-2 rounded border border-slate-200 break-words select-all max-h-36 overflow-y-auto leading-relaxed">
                             {msg.text}
                           </div>
                           {renderMessageTags(msg.text)}
                         </td>
 
-                        <td className="py-3 px-4 text-center text-slate-400 font-medium">
+                        <td className="py-3 px-4 text-center text-slate-500 font-medium">
                           {msg.views}
                         </td>
                       </tr>
@@ -897,7 +897,7 @@ export const ChannelDetailPage: React.FC = () => {
                   </tbody>
                 </table>
               ) : (
-                <div className="p-5 font-sans text-xs text-slate-300 leading-relaxed bg-darkCard/10 select-text rounded-lg border border-darkBorder/40">
+                <div className="p-5 font-sans text-xs text-slate-700 leading-relaxed bg-white select-text rounded-lg border border-darkBorder/40">
                   {liveReportLoading ? (
                     <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
                       <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
@@ -916,30 +916,30 @@ export const ChannelDetailPage: React.FC = () => {
         <div className="flex flex-col gap-4 min-h-0">
           
           {/* Spec details card */}
-          <div className="glass-card p-4 rounded-xl border border-darkBorder bg-darkCard/40 shrink-0 space-y-2">
-            <h4 className="text-[10px] font-bold text-white uppercase tracking-wider">Automated Scraper Specs</h4>
-            <p className="text-[10px] text-slate-400 leading-normal">
+          <div className="glass-card p-4 rounded-xl border border-darkBorder bg-darkCard shrink-0 space-y-2">
+            <h4 className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">Automated Scraper Specs</h4>
+            <p className="text-[10px] text-slate-500 leading-normal">
               Silent background crawls automatically download de-duplicated messages, update risk factors, and append values to CSV backups.
             </p>
           </div>
 
           {/* Terminal output console */}
           <div className="flex-1 flex flex-col min-h-0 bg-darkCard border border-darkBorder rounded-xl overflow-hidden">
-            <div className="p-3 border-b border-darkBorder bg-darkCard/50 flex items-center justify-between shrink-0">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="p-3 border-b border-darkBorder bg-darkCard flex items-center justify-between shrink-0">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-emerald-600" />
                 Live Scraper Output Logs
               </h3>
             </div>
             
-            <div className="flex-1 bg-darkBg/95 p-3.5 font-mono text-[9px] text-emerald-400 overflow-y-auto space-y-1 shadow-inner select-all leading-normal">
+            <div className="flex-1 bg-slate-900 p-3.5 font-mono text-[9px] text-emerald-400 overflow-y-auto space-y-1 shadow-inner select-all leading-normal">
               {channelLogs.map((log, idx) => (
                 <div key={idx} className="break-all whitespace-pre-wrap">
                   {log}
                 </div>
               ))}
               {channelLogs.length === 0 && (
-                <div className="text-slate-600 italic">Logs are populated during execution runs...</div>
+                <div className="text-slate-500 italic">Logs are populated during execution runs...</div>
               )}
             </div>
           </div>
@@ -949,13 +949,13 @@ export const ChannelDetailPage: React.FC = () => {
 
       {/* AI Threat Intelligence Report Modal */}
       {showReportModal && reportMarkdown && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-darkBg border border-cyan-500/35 w-full max-w-4xl h-[80vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl relative animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-cyan-500/35 w-full max-w-4xl h-[80vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl relative animate-fade-in">
             {/* Header */}
             <div className="h-14 px-5 bg-darkCard border-b border-darkBorder flex items-center justify-between">
-              <div className="flex items-center gap-2 text-cyan-400">
-                <Cpu className="w-5 h-5 text-cyan-400" />
-                <span className="text-sm font-bold uppercase tracking-wider text-slate-100">
+              <div className="flex items-center gap-2 text-cyan-600">
+                <Cpu className="w-5 h-5 text-cyan-600" />
+                <span className="text-sm font-bold uppercase tracking-wider text-slate-800">
                   AI Threat Intelligence Report: {channel.title}
                 </span>
               </div>
@@ -973,14 +973,14 @@ export const ChannelDetailPage: React.FC = () => {
                 )}
                 <button
                   onClick={handleCopyReport}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-darkBg font-bold text-xs rounded-lg transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition-all"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   {copied ? 'Copied!' : 'Copy Markdown'}
                 </button>
                 <button
                   onClick={() => setShowReportModal(false)}
-                  className="w-8 h-8 rounded-lg bg-darkBorder text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors border border-slate-200"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -988,7 +988,7 @@ export const ChannelDetailPage: React.FC = () => {
             </div>
 
             {/* Markdown Display Body */}
-            <div className="flex-1 p-6 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed bg-darkCard/25 select-text select-all whitespace-pre-wrap">
+            <div className="flex-1 p-6 overflow-y-auto font-mono text-xs text-slate-700 leading-relaxed bg-slate-50/50 select-text select-all whitespace-pre-wrap">
               {reportMarkdown}
             </div>
           </div>

@@ -93,10 +93,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
           <Shield className="w-4 h-4 text-white" />
         </div>
         <div className="flex items-center gap-2">
-          <h1 className="font-bold text-xs text-slate-100 uppercase tracking-wider">
+          <h1 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
             Telegram Darknet Monitor
           </h1>
-          <span className="px-1.5 py-0.5 text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded">
+          <span className="px-1.5 py-0.5 text-[9px] font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20 rounded">
             CTI v1.0
           </span>
         </div>
@@ -104,8 +104,8 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
 
       <div className="flex items-center gap-4">
         {/* System status indicator pill */}
-        <div className="flex items-center gap-2 bg-darkBg px-2.5 py-1 rounded-lg border border-darkBorder text-[11px] font-medium text-slate-400">
-          <div className={`w-2 h-2 rounded-full ${isScraping ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+        <div className="flex items-center gap-2 bg-darkBg px-2.5 py-1 rounded-lg border border-darkBorder text-[11px] font-medium text-slate-600">
+          <div className={`w-2 h-2 rounded-full ${isScraping ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
           <span>{isScraping ? 'System Scraping' : 'System Idle'}</span>
         </div>
 
@@ -115,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
           {/* Bell Icon Trigger */}
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className={`p-1.5 rounded-lg transition-colors relative hover:bg-darkBg ${dropdownOpen ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`p-1.5 rounded-lg transition-colors relative hover:bg-slate-100 ${dropdownOpen ? 'text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
@@ -129,14 +129,14 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
           {dropdownOpen && (
             <div className="absolute right-0 top-full mt-2 w-80 glass-card rounded-xl border border-darkBorder/60 shadow-2xl p-4 space-y-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between border-b border-darkBorder/50 pb-2">
-                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Bell className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Bell className="w-3.5 h-3.5 text-cyan-500" />
                   Notifications logs
                 </span>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllRead}
-                    className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+                    className="text-[10px] font-bold text-cyan-600 hover:text-cyan-500 transition-colors flex items-center gap-1"
                   >
                     <Check className="w-3 h-3" />
                     Mark all read
@@ -146,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
 
               <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                 {notifications.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-xs">
+                  <div className="text-center py-6 text-slate-400 text-xs">
                     No notifications logged today.
                   </div>
                 ) : (
@@ -156,15 +156,15 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
                       className={`p-2.5 rounded-lg border text-xs flex items-start gap-2.5 transition-all ${
                         notif.read
                           ? 'bg-transparent border-darkBorder/30 text-slate-400'
-                          : 'bg-blue-500/5 border-blue-500/20 text-slate-200 shadow-sm'
+                          : 'bg-blue-500/5 border-blue-500/20 text-slate-700 shadow-sm'
                       }`}
                     >
-                      <div className="mt-0.5 shrink-0 bg-darkBg/60 p-1 rounded-md border border-darkBorder/40">
+                      <div className="mt-0.5 shrink-0 bg-slate-100 p-1 rounded-md border border-darkBorder/40">
                         {renderNotifIcon(notif.type)}
                       </div>
                       <div className="flex-1 space-y-1">
                         <p className="leading-relaxed text-[11px] font-mono break-words">{notif.message}</p>
-                        <span className="block text-[9px] text-slate-500 font-medium">{notif.timestamp} IST</span>
+                        <span className="block text-[9px] text-slate-400 font-medium">{notif.timestamp} IST</span>
                       </div>
                     </div>
                   ))
@@ -173,7 +173,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
             </div>
           )}
 
-          <div className="w-7 h-7 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold text-xs shadow-md">
+          <div className="w-7 h-7 rounded-full bg-purple-600/10 border border-purple-500/20 text-purple-600 flex items-center justify-center font-bold text-xs shadow-sm">
             CT
           </div>
         </div>

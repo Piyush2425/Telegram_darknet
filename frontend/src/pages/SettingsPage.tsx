@@ -192,24 +192,24 @@ export const SettingsPage: React.FC = () => {
         {/* Telegram API Inputs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API ID</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Telegram API ID</label>
             <input
               type="password"
               placeholder="Loaded from backend .env"
               value={apiId}
               onChange={(e) => setApiId(e.target.value)}
-              className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+              className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Telegram API Hash</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Telegram API Hash</label>
             <input
               type="password"
               placeholder="Loaded from backend .env"
               value={apiHash}
               onChange={(e) => setApiHash(e.target.value)}
-              className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+              className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
             />
           </div>
         </div>
@@ -219,8 +219,8 @@ export const SettingsPage: React.FC = () => {
           {step === 'PHONE' && (
             <form onSubmit={handleSendOtp} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-cyan-400" />
+                <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-cyan-500" />
                   Telegram Account Phone Number (International Format)
                 </label>
                 <div className="flex gap-2">
@@ -229,7 +229,7 @@ export const SettingsPage: React.FC = () => {
                     placeholder="e.g. +919876543210 or +12025550123"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="flex-1 bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+                    className="flex-1 bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
                   />
                   <button
                     type="submit"
@@ -249,7 +249,7 @@ export const SettingsPage: React.FC = () => {
             <form onSubmit={handleVerifyOtp} className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
                     Telegram Login OTP Code
                   </label>
                   <input
@@ -257,13 +257,13 @@ export const SettingsPage: React.FC = () => {
                     placeholder="e.g. 58392"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value)}
-                    className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-cyan-500 focus:outline-none font-mono text-center tracking-widest text-base font-bold"
+                    className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-cyan-500 focus:outline-none font-mono text-center tracking-widest text-base font-bold"
                   />
                 </div>
 
                 {step === '2FA' && (
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
                       Two-Factor (2FA) Password
                     </label>
                     <input
@@ -271,7 +271,7 @@ export const SettingsPage: React.FC = () => {
                       placeholder="Enter 2FA password"
                       value={password2FA}
                       onChange={(e) => setPassword2FA(e.target.value)}
-                      className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-purple-500 focus:outline-none"
+                      className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-purple-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -301,35 +301,35 @@ export const SettingsPage: React.FC = () => {
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Local LLM Configuration Section */}
-        <div className="glass-card p-6 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 space-y-4">
+        <div className="glass-card p-6 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-sm font-bold text-cyan-600 uppercase tracking-wider flex items-center gap-2">
               <Server className="w-4 h-4" />
               Local LLM Integration (Ollama / LM Studio / LocalAI / vLLM)
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20">
               PRIVACY FIRST • LOCAL INFERENCE
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Local LLM Endpoint URL</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Local LLM Endpoint URL</label>
               <input
                 type="text"
                 value={localLlmUrl}
                 onChange={(e) => setLocalLlmUrl(e.target.value)}
-                className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+                className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Local Model Name</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Local Model Name</label>
               <input
                 type="text"
                 value={localLlmModel}
                 onChange={(e) => setLocalLlmModel(e.target.value)}
-                className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
+                className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-cyan-500 font-mono"
               />
             </div>
           </div>
@@ -339,19 +339,19 @@ export const SettingsPage: React.FC = () => {
               type="button"
               onClick={handleTestLocalLlm}
               disabled={testingLlm}
-              className="flex items-center gap-2 px-3.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold rounded-xl transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-600 text-xs font-bold rounded-xl transition-all"
             >
               <Cpu className={`w-3.5 h-3.5 ${testingLlm ? 'animate-spin' : ''}`} />
               {testingLlm ? 'Pinging Local LLM...' : 'Test Connection to Local LLM'}
             </button>
 
             {llmTestResult === 'success' && (
-              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-4 h-4" /> Local LLM Endpoint Reachable!
               </span>
             )}
             {llmTestResult === 'failed' && (
-              <span className="text-xs text-amber-400 font-semibold flex items-center gap-1">
+              <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
                 <XCircle className="w-4 h-4" /> Local LLM offline. Automatic regex fallback active.
               </span>
             )}
@@ -360,18 +360,18 @@ export const SettingsPage: React.FC = () => {
 
         {/* Database Storage Configuration */}
         <div className="glass-card p-6 rounded-2xl border border-darkBorder space-y-4">
-          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-            <Database className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <Database className="w-4 h-4 text-emerald-600" />
             MongoDB Storage Configuration
           </h3>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">MongoDB Connection URI</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">MongoDB Connection URI</label>
             <input
               type="text"
               value={mongoUri}
               onChange={(e) => setMongoUri(e.target.value)}
-              className="w-full bg-darkBg text-xs text-white px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-emerald-500 font-mono"
+              className="w-full bg-darkBg text-xs text-slate-800 px-3.5 py-2.5 rounded-xl border border-darkBorder focus:outline-none focus:border-emerald-500 font-mono"
             />
           </div>
         </div>
