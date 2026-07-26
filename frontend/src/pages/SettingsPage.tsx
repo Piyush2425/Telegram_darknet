@@ -138,7 +138,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="w-full max-w-5xl space-y-5">
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <SettingsIcon className="w-5 h-5 text-cyan-400" />

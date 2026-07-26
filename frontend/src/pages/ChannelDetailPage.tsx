@@ -449,10 +449,10 @@ export const ChannelDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-darkBg text-slate-100 flex flex-col overflow-hidden p-4 font-sans select-none">
+    <div className="h-screen bg-darkBg text-slate-100 flex flex-col overflow-hidden p-3.5 font-sans select-none">
       
       {/* 1. Header Navigation Bar (Thin, Compact) */}
-      <div className="flex items-center justify-between pb-3 border-b border-darkBorder mb-3 shrink-0">
+      <div className="flex items-center justify-between pb-2 border-b border-darkBorder mb-2.5 shrink-0">
         <button
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"

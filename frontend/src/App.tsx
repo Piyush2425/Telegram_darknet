@@ -38,7 +38,7 @@ export function App() {
               <div className="flex-1 flex overflow-hidden">
                 <Sidebar />
 
-                <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+                <main className="flex-1 p-5 overflow-y-auto h-[calc(100vh-3.5rem)]">
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/settings" element={<SettingsPage />} />

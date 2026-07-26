@@ -136,7 +136,7 @@ export const DashboardPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto relative p-2">
+    <div className="space-y-5 w-full relative">
       {/* Overview Dashboard Header block */}
       <div className="flex items-center justify-between">
         <div>
