@@ -15,6 +15,7 @@ frontend/dist/
 .npm/
 data/
 data
+.vscode/
 # Python Cache & Build
 __pycache__/
 *.py[cod]
