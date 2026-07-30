@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, AlertTriangle, Shield, AlertCircle, Info, ExternalLink, Loader2, X, Filter } from 'lucide-react';
-import { globalSearch } from '../services/api';
-import { Message } from '../types';
+import { globalSearch, getChannels } from '../services/api';
+import { Message, Channel } from '../types';
 
 const THREAT_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   CRITICAL: { label: 'CRITICAL', color: 'text-red-700', bg: 'bg-red-100 border-red-300', icon: <AlertTriangle className="w-3 h-3" /> },
@@ -47,11 +47,26 @@ export const GlobalSearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState('ALL');
   const [results, setResults] = useState<Message[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getChannels().then(setChannels).catch(console.error);
+  }, []);
+
+  const getChannelName = useCallback((msg: Message) => {
+    const matched = channels.find(c => c.id === msg.channel_id);
+    if (matched) return matched.title;
+    // Fallback: strip leading dash or number-only usernames if they look like IDs
+    if (msg.channel_username && !msg.channel_username.startsWith('-') && !/^\d+$/.test(msg.channel_username)) {
+      return msg.channel_username;
+    }
+    return msg.channel_id;
+  }, [channels]);
 
   const doSearch = useCallback(async (q: string, tl: string) => {
     if (!q.trim()) {
@@ -91,7 +106,7 @@ export const GlobalSearchPage: React.FC = () => {
 
   // Group results by channel for the stats bar
   const channelCounts = results.reduce((acc, m) => {
-    const name = m.channel_username || m.channel_id || 'Unknown';
+    const name = getChannelName(m);
     acc[name] = (acc[name] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -210,8 +225,8 @@ export const GlobalSearchPage: React.FC = () => {
                   >
                     {/* Channel */}
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800 truncate max-w-[140px]" title={msg.channel_username || msg.channel_id}>
-                        {msg.channel_username || msg.channel_id || '—'}
+                      <div className="font-semibold text-slate-800 truncate max-w-[140px]" title={getChannelName(msg)}>
+                        {getChannelName(msg)}
                       </div>
                     </td>
 
