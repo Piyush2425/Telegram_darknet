@@ -1,8 +1,27 @@
 import logging
+import re
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from ..config import settings
 
 logger = logging.getLogger("darknet_monitor.db")
+
+def get_channel_dir(channel_id: str, channel_title: str = "") -> Path:
+    """Return the base folder for a channel: data/{safe_title}/ if title is known/given, else data/{channel_id}/."""
+    def safe_name(s: str) -> str:
+        s = re.sub(r"\W+", "_", (s or "").strip())
+        s = s.strip("_")
+        return s[:80] if s else "target"
+
+    title = channel_title
+    if not title:
+        ch = store.channels.get(channel_id, {})
+        title = ch.get("title", "")
+
+    if title:
+        return settings.DATA_DIR / safe_name(title)
+    return settings.DATA_DIR / channel_id
+
 
 class InMemoryStore:
     """In-memory database store. Channels are populated from real Telegram account after login."""

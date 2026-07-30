@@ -29,12 +29,24 @@ async def get_message_count():
         data_dir = settings.DATA_DIR
         if data_dir.exists():
             for channel_dir in data_dir.iterdir():
-                if not channel_dir.is_dir():
+                if not channel_dir.is_dir() or channel_dir.name in ["media", "reports"]:
                     continue
                 chats_dir = channel_dir / "chats"
                 if not chats_dir.exists():
                     continue
-                ch_id = channel_dir.name
+                ch_id_or_title = channel_dir.name
+
+                # Try to map ch_id_or_title to a real channel_id in store.channels
+                real_channel_id = ch_id_or_title
+                for cid, ch in store.channels.items():
+                    if cid == ch_id_or_title:
+                        real_channel_id = cid
+                        break
+                    safe = re.sub(r"\W+", "_", (ch.get("title") or "").strip()).strip("_")[:80]
+                    if safe == ch_id_or_title:
+                        real_channel_id = cid
+                        break
+
                 ch_count = 0
                 for csv_path in chats_dir.glob("messages_*.csv"):
                     try:
@@ -44,7 +56,7 @@ async def get_message_count():
                     except Exception:
                         pass
                 if ch_count > 0:
-                    channel_csv_counts[ch_id] = ch_count
+                    channel_csv_counts[real_channel_id] = ch_count
                     csv_total += ch_count
     except Exception:
         pass
@@ -57,6 +69,7 @@ async def get_message_count():
         "per_channel_in_memory": dict(counts),
         "per_channel_on_disk": channel_csv_counts,
     }
+
 
 
 @router.get("/global-search")
@@ -91,9 +104,8 @@ async def global_search_messages(
 def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
     """Load and parse messages from CSV file for the channel."""
     messages = []
-    try:
-        # Actual storage path: data/{channel_id}/chats/messages_{YYYY-MM-DD}.csv
-        chats_dir = settings.DATA_DIR / channel_id / "chats"
+    def _try_load(chats_dir):
+        loaded = []
         if chats_dir.exists():
             for csv_path in sorted(chats_dir.glob("messages_*.csv")):
                 try:
@@ -103,7 +115,7 @@ def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
                     if len(rows) > 1:
                         for r in rows[1:]:
                             if len(r) >= 6:
-                                messages.append({
+                                loaded.append({
                                     "id": r[0],
                                     "channel_id": channel_id,
                                     "channel_username": channel_title,
@@ -117,7 +129,17 @@ def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
                                 })
                 except Exception:
                     pass
-    except Exception as e:
+        return loaded
+
+    try:
+        safe_title = re.sub(r"\W+", "_", (channel_title or "").strip()).strip("_")[:80]
+        # Try title-based folder first (new naming scheme)
+        if safe_title:
+            messages = _try_load(settings.DATA_DIR / safe_title / "chats")
+        # Fallback to old numeric-ID folder
+        if not messages:
+            messages = _try_load(settings.DATA_DIR / channel_id / "chats")
+    except Exception:
         pass
     return messages
 

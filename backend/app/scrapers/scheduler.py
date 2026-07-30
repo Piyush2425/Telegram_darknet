@@ -2,7 +2,7 @@ import asyncio
 import logging
 import json
 from datetime import datetime, timedelta, timezone
-from ..db.mongodb import store
+from ..db.mongodb import store, get_channel_dir
 from ..scrapers.telegram_scraper import telegram_scraper
 from ..llm.threat_analyzer import analyzer
 from ..reports.report_generator import report_generator
@@ -25,7 +25,7 @@ async def run_mini_ai_analysis_cycle(channel_id: str):
     try:
         from ..config import settings
         date_str = datetime.now(IST).strftime("%Y-%m-%d")
-        channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+        channel_reports_dir = get_channel_dir(channel_id, ch["title"]) / "reports"
         channel_reports_dir.mkdir(parents=True, exist_ok=True)
         
         state_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.state.json"
@@ -391,7 +391,7 @@ async def generate_auto_report_task(channel_id: str):
     try:
         from ..config import settings
         date_str = datetime.now(IST).strftime("%Y-%m-%d")
-        channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+        channel_reports_dir = get_channel_dir(channel_id, ch["title"]) / "reports"
         log_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.md"
         
         if not log_path.exists():

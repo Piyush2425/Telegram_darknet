@@ -19,26 +19,62 @@ from .scrapers.scheduler import run_scheduler, stop_scheduler
 logger = logging.getLogger("darknet_monitor")
 
 
+def _migrate_numeric_folders_to_titles():
+    """Migrate old numeric channel ID folders to new safe channel title folders if titles are available."""
+    data_dir = settings.DATA_DIR
+    if not data_dir.exists():
+        return
+    migrated = 0
+    for ch_id, ch in list(store.channels.items()):
+        old_dir = data_dir / ch_id
+        if old_dir.exists() and old_dir.is_dir():
+            title = ch.get("title", "")
+            if title:
+                safe_title = re.sub(r"\W+", "_", title.strip()).strip("_")[:80]
+                if safe_title and safe_title != ch_id:
+                    new_dir = data_dir / safe_title
+                    if not new_dir.exists():
+                        try:
+                            old_dir.rename(new_dir)
+                            logger.info(f"📁 Migrated channel folder structure: {ch_id} → {safe_title}")
+                            migrated += 1
+                        except Exception as e:
+                            logger.warning(f"Failed to migrate folder {ch_id} to {safe_title}: {e}")
+    if migrated:
+        logger.info(f"✓ Successfully migrated {migrated} channel folders to title-based naming.")
+
+
 def _restore_all_csv_messages():
-    """Scan all data/{channel_id}/chats/messages_*.csv files and bulk-load into store.messages on startup."""
+    """Scan all data/{channel_dir}/chats/messages_*.csv files and bulk-load into store.messages on startup."""
     data_dir = settings.DATA_DIR
     if not data_dir.exists():
         return
     loaded = 0
-    # Walk every subdirectory of data/ — each is a channel_id folder
+    # Walk every subdirectory of data/ — each is a channel folder
     for channel_dir in data_dir.iterdir():
-        if not channel_dir.is_dir():
+        if not channel_dir.is_dir() or channel_dir.name in ["media", "reports"]:
             continue
         chats_dir = channel_dir / "chats"
         if not chats_dir.exists():
             continue
 
-        # The subdirectory name IS the channel_id (e.g. "-1001619134470")
         ch_id_on_disk = channel_dir.name
 
-        # Try to find a matching channel in store by id
-        ch_in_store = store.channels.get(ch_id_on_disk)
-        channel_title = ch_in_store.get("title", ch_id_on_disk) if ch_in_store else ch_id_on_disk
+        # Try to find a matching channel in store by id or safe title
+        matched_channel_id = None
+        channel_title = ch_id_on_disk
+        for ch_id, ch in store.channels.items():
+            if ch_id == ch_id_on_disk:
+                matched_channel_id = ch_id
+                channel_title = ch.get("title", ch_id)
+                break
+            safe_title = re.sub(r"\W+", "_", (ch.get("title") or "").strip()).strip("_")[:80]
+            if safe_title == ch_id_on_disk:
+                matched_channel_id = ch_id
+                channel_title = ch.get("title", ch_id)
+                break
+
+        real_channel_id = matched_channel_id or ch_id_on_disk
 
         # Load every date-wise CSV for this channel
         for csv_path in sorted(chats_dir.glob("messages_*.csv")):
@@ -54,7 +90,7 @@ def _restore_all_csv_messages():
                         if msg_id not in store.messages:
                             store.messages[msg_id] = {
                                 "id": msg_id,
-                                "channel_id": ch_id_on_disk,
+                                "channel_id": real_channel_id,
                                 "channel_username": channel_title,
                                 "sender": r[2],
                                 "text": r[3],
@@ -79,7 +115,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"TELEGRAM_API_ID = {settings.TELEGRAM_API_ID}")
     logger.info(f"TELEGRAM_API_HASH = {'*' * 6 + settings.TELEGRAM_API_HASH[-4:] if settings.TELEGRAM_API_HASH else 'NOT SET'}")
 
-    # Restore all persisted CSV messages into memory first (before channel sync)
+    # Restore any already migrated title-based or existing ID folders
     _restore_all_csv_messages()
 
     # Auto-sync channels if user session is already saved
@@ -91,12 +127,14 @@ async def lifespan(app: FastAPI):
             logger.info(f"✓ Telegram session active — logged in as @{username}. Auto-syncing channels...")
             channels = await telegram_scraper.sync_user_dialogs()
             logger.info(f"✓ Auto-imported {len(channels)} real channels/groups from Telegram account.")
-            # Re-run restore to pick up any channel_id matches now that channels are loaded
+            # Run migration of folders and reload to map them correctly
+            _migrate_numeric_folders_to_titles()
             _restore_all_csv_messages()
         else:
             logger.info(f"No active Telegram session. Please authenticate via Settings page.")
     except Exception as e:
         logger.warning(f"Auto-sync skipped: {e}")
+
 
     # Start the automated target channel scheduler in background!
     asyncio.create_task(run_scheduler())

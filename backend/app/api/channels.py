@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from ..db.mongodb import store
+from ..db.mongodb import store, get_channel_dir
 
 IST = timezone(timedelta(hours=5, minutes=30))
 from ..db.models import Channel
@@ -30,18 +30,23 @@ def _safe_name(s: str) -> str:
     s = s.strip("_")
     return s[:80] if s else "target"
 
-def _get_csv_message_count(channel_title: str) -> int:
-    """Read the channel's CSV file and return the count of messages."""
+def _get_csv_message_count(channel_id: str, channel_title: str) -> int:
+    """Read the channel's CSV files and return the count of messages."""
     try:
-        safe_name = _safe_name(channel_title)
-        csv_path = settings.BASE_DIR / "data" / "chats" / f"messages_{safe_name}.csv"
-        if csv_path.exists():
+        chats_dir = get_channel_dir(channel_id, channel_title) / "chats"
+        if not chats_dir.exists():
+            chats_dir = settings.DATA_DIR / channel_id / "chats"
+        if not chats_dir.exists():
+            return 0
+
+        count = 0
+        for csv_path in chats_dir.glob("messages_*.csv"):
             with open(csv_path, "r", encoding="utf-8") as f:
                 reader = csv.reader(f)
                 rows = list(reader)
-                if len(rows) > 0:
-                    return len(rows) - 1 # Subtract header row
-        return 0
+                if len(rows) > 1:
+                    count += len(rows) - 1
+        return count
     except Exception:
         return 0
 
@@ -50,8 +55,9 @@ async def list_channels():
     """List all available Telegram channels & groups with persisted message counts from CSV."""
     channels = list(store.channels.values())
     for ch in channels:
-        ch["message_count"] = _get_csv_message_count(ch["title"])
+        ch["message_count"] = _get_csv_message_count(ch["id"], ch["title"])
     return channels
+
 
 @router.post("/sync-telegram")
 async def sync_user_telegram_channels():
@@ -296,7 +302,7 @@ async def generate_channel_ai_report(channel_id: str, req: AIReportRequest):
     report_id = f"rep_ai_{timestamp_str}"
     
     # Define file paths
-    channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+    channel_reports_dir = get_channel_dir(channel_id, ch["title"]) / "reports"
     channel_reports_dir.mkdir(parents=True, exist_ok=True)
     
     pdf_path = channel_reports_dir / f"AI_Report_{channel_id}_{timestamp_str}.pdf"
@@ -348,7 +354,7 @@ async def get_live_channel_report(channel_id: str, date: Optional[str] = None):
     # Defaults to today in India Standard Time (IST)
     date_str = date or datetime.now(IST).strftime("%Y-%m-%d")
     
-    channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+    channel_reports_dir = get_channel_dir(channel_id, ch["title"]) / "reports"
     log_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.md"
     
     if not log_path.exists():
@@ -376,7 +382,7 @@ async def download_live_report_pdf(channel_id: str, date: Optional[str] = None):
     ch = store.channels[channel_id]
     date_str = date or datetime.now(IST).strftime("%Y-%m-%d")
     
-    channel_reports_dir = settings.DATA_DIR / channel_id / "reports"
+    channel_reports_dir = get_channel_dir(channel_id, ch["title"]) / "reports"
     log_path = channel_reports_dir / f"ChatLog_{channel_id}_{date_str}.md"
     
     if not log_path.exists():

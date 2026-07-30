@@ -102,13 +102,28 @@ class TelegramScraper:
         s = s.strip("_")
         return s[:80] if s else "target"
 
-    def _get_latest_saved_msg_id(self, channel_id: str) -> int:
-        """Parse all channel CSV files under data/{channel_id}/chats/ and return the maximum raw Telethon message ID stored."""
+    def _channel_dir(self, channel_id: str, channel_title: str = "") -> Path:
+        """Return the base folder for a channel: data/{safe_title}/ if title exists, else data/{channel_id}/."""
+        if channel_title:
+            return settings.DATA_DIR / self._safe_name(channel_title)
+        # Fallback: try to resolve title from store
+        ch = store.channels.get(channel_id, {})
+        title = ch.get("title", "")
+        if title:
+            return settings.DATA_DIR / self._safe_name(title)
+        return settings.DATA_DIR / channel_id
+
+    def _get_latest_saved_msg_id(self, channel_id: str, channel_title: str = "") -> int:
+        """Parse all channel CSV files and return the maximum raw Telethon message ID stored."""
         try:
-            chats_dir = settings.DATA_DIR / channel_id / "chats"
+            # Try title-based folder first, then fallback to old numeric ID folder
+            chats_dir = self._channel_dir(channel_id, channel_title) / "chats"
+            if not chats_dir.exists():
+                # Backward-compat: try old numeric-ID folder
+                chats_dir = settings.DATA_DIR / channel_id / "chats"
             if not chats_dir.exists():
                 return 0
-            
+
             max_id = 0
             for csv_file in chats_dir.glob("messages_*.csv"):
                 with open(csv_file, "r", encoding="utf-8") as f:
@@ -131,9 +146,13 @@ class TelegramScraper:
             logger.error(f"Error reading latest saved message ID: {e}")
             return 0
 
-    def _write_messages_to_csv(self, channel_id: str, messages: List[Dict[str, Any]]):
-        """Store scraped data in CSV date-wise under data/{channel_id}/chats/ directory."""
+    def _write_messages_to_csv(self, channel_id: str, channel_title: str, messages: List[Dict[str, Any]]):
+        """Store scraped data in CSV date-wise under data/{channel_title}/chats/ directory."""
         try:
+            # Determine folder using safe channel title
+            base_dir = self._channel_dir(channel_id, channel_title)
+            safe_title = base_dir.name
+
             # Group messages by their posting dates converted to India Standard Time (IST)
             ist = timezone(timedelta(hours=5, minutes=30))
             msgs_by_date = {}
@@ -150,10 +169,10 @@ class TelegramScraper:
                 msgs_by_date[msg_date_str].append(msg)
 
             for date_str, date_msgs in msgs_by_date.items():
-                chats_dir = settings.DATA_DIR / channel_id / "chats"
+                chats_dir = base_dir / "chats"
                 chats_dir.mkdir(parents=True, exist_ok=True)
                 csv_file = chats_dir / f"messages_{date_str}.csv"
-                
+
                 existing_ids = set()
                 file_exists = csv_file.exists()
                 if file_exists:
@@ -164,12 +183,12 @@ class TelegramScraper:
                             for row in rows[1:]:  # Skip header row
                                 if len(row) > 0:
                                     existing_ids.add(row[0])
-                
+
                 # De-duplicate
                 new_messages = [m for m in date_msgs if m.get("id") not in existing_ids]
                 if not new_messages:
                     continue
-                
+
                 # Sort chronologically so they append in ascending order
                 new_messages.sort(key=lambda x: x.get("id"))
 
@@ -177,7 +196,7 @@ class TelegramScraper:
                     writer = csv.writer(f)
                     if not file_exists:
                         writer.writerow(["message_id", "date", "sender", "text", "views", "threat_level"])
-                    
+
                     for msg in new_messages:
                         writer.writerow([
                             msg.get("id"),
@@ -187,7 +206,7 @@ class TelegramScraper:
                             msg.get("views", 0),
                             msg.get("threat_level", "LOW")
                         ])
-                self.log(f"✓ Appended {len(new_messages)} unique messages to: data/{channel_id}/chats/messages_{date_str}.csv")
+                self.log(f"✓ Appended {len(new_messages)} new messages → data/{safe_title}/chats/messages_{date_str}.csv")
         except Exception as e:
             logger.error(f"Error saving messages to CSV: {e}")
 
@@ -467,8 +486,8 @@ class TelegramScraper:
                         self.scrape_queue.remove(self.current_channel)
                     store.channels[ch_id]["status"] = "scraping"
 
-                    # Check for incremental scraping stage
-                    latest_raw_id = self._get_latest_saved_msg_id(ch_id)
+                    # Check for incremental scraping stage (try title-based folder first)
+                    latest_raw_id = self._get_latest_saved_msg_id(ch_id, self.current_channel)
                     
                     if latest_raw_id > 0:
                         self.log(f"🔄 Incremental scrape active for '{self.current_channel}'. Only fetching posts newer than message ID {latest_raw_id}...")
@@ -535,9 +554,9 @@ class TelegramScraper:
 
                             self.log(f"✓ Extracted {len(scraped_from_channel)} new posts from '{self.current_channel}'")
                             
-                            # Store channel-wise CSV in backend (de-duplicated)
+                            # Store channel-wise CSV under title-based folder (de-duplicated)
                             if scraped_from_channel:
-                                self._write_messages_to_csv(ch_id, scraped_from_channel)
+                                self._write_messages_to_csv(ch_id, self.current_channel, scraped_from_channel)
                                 store.add_notification("scrape", f"✓ Scraped {len(scraped_from_channel)} new messages from '{self.current_channel}'")
 
 
