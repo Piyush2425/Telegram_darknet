@@ -80,6 +80,9 @@ export interface ScraperStatus {
   progress: number;
   current_channel: string;
   logs: string[];
+  scrape_queue: string[];
+  completed_channels: string[];
+  total_channels_count: number;
 }
 
 export interface IntelligenceSummary {

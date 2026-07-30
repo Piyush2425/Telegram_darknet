@@ -34,6 +34,10 @@ class TelegramScraper:
         self.phone_code_hash: Optional[str] = None
         self.active_phone: Optional[str] = None
         self._lock = asyncio.Lock()
+        # Queue tracking for multi-channel progress panel
+        self.scrape_queue: List[str] = []      # channel titles yet to be scraped
+        self.completed_channels: List[str] = [] # channel titles finished
+        self.total_channels_count: int = 0
 
     def log(self, message: str):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -412,6 +416,9 @@ class TelegramScraper:
         self.is_scraping = True
         self.progress = 0
         self.logs.clear()
+        self.total_channels_count = len(channels)
+        self.scrape_queue = [ch.get("title", ch.get("id", "?")) for ch in channels]
+        self.completed_channels = []
         self.log(f"Initiating Telegram data collection across {len(channels)} channels...")
 
         all_scraped_messages = []
@@ -433,6 +440,9 @@ class TelegramScraper:
                     target_entity = raw_user if raw_user else int(ch_id) if str(ch_id).lstrip("-").isdigit() else ch_id
 
                     self.current_channel = channel.get("title", str(target_entity))
+                    # Remove from queue as we start scraping it
+                    if self.current_channel in self.scrape_queue:
+                        self.scrape_queue.remove(self.current_channel)
                     store.channels[ch_id]["status"] = "scraping"
 
                     # Check for incremental scraping stage
@@ -519,6 +529,9 @@ class TelegramScraper:
 
                     all_scraped_messages.extend(scraped_from_channel)
                     self.progress = int(((idx + 1) / total_channels) * 100)
+                    # Mark channel as completed
+                    if self.current_channel not in self.completed_channels:
+                        self.completed_channels.append(self.current_channel)
         finally:
             # Guarantee cleanup of status flags
             for ch in store.channels.values():

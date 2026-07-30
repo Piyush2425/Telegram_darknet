@@ -45,5 +45,8 @@ async def get_scraping_status():
         "is_scraping": telegram_scraper.is_scraping,
         "progress": telegram_scraper.progress,
         "current_channel": telegram_scraper.current_channel,
-        "logs": telegram_scraper.logs
+        "logs": telegram_scraper.logs,
+        "scrape_queue": telegram_scraper.scrape_queue,
+        "completed_channels": telegram_scraper.completed_channels,
+        "total_channels_count": telegram_scraper.total_channels_count,
     }

@@ -196,7 +196,7 @@ export const ChannelDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const [channel, setChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [] });
+  const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
   const [channelLogs, setChannelLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isScrapingChannel, setIsScrapingChannel] = useState(false);

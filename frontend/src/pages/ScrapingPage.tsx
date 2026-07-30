@@ -5,7 +5,7 @@ import { Channel, ScraperStatus } from '../types';
 
 export const ScrapingPage: React.FC = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [] });
+  const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
