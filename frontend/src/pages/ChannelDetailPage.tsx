@@ -239,26 +239,33 @@ export const ChannelDetailPage: React.FC = () => {
   const fetchChannelData = async () => {
     if (!channelId) return;
     try {
-      const [chData, msgData] = await Promise.all([
-        getChannels(),
-        getMessages({ channel_id: channelId })
-      ]);
-      const currentCh = chData.find(c => c.id === channelId);
+      const chData = await getChannels();
+      const currentCh = chData.find(c => {
+        if (c.id === channelId) return true;
+        const safeTitle = c.title ? c.title.replace(/\W+/g, '_').replace(/^_+|_+$/g, '').substring(0, 80) : '';
+        return safeTitle === channelId;
+      });
+
       if (currentCh) {
         setChannel(currentCh);
         setIsAutoMonitoring(!!currentCh.is_auto_monitoring);
         setIntervalVal(currentCh.monitoring_interval_value || 15);
         setIntervalUnit(currentCh.monitoring_interval_unit || 'minutes');
-        
+
         setIsAutoAi(!!currentCh.is_auto_ai);
         setAiIntervalVal(currentCh.ai_interval_value || 60);
         setAiIntervalUnit(currentCh.ai_interval_unit || 'minutes');
-        
+
         setIsAutoReport(!!currentCh.is_auto_report);
         setReportIntervalVal(currentCh.report_interval_value || 24);
         setReportIntervalUnit(currentCh.report_interval_unit || 'hours');
+
+        const msgData = await getMessages({ channel_id: currentCh.id });
+        setMessages(msgData);
+      } else {
+        const msgData = await getMessages({ channel_id: channelId });
+        setMessages(msgData);
       }
-      setMessages(msgData);
     } catch (e) {
       console.error("Error loading channel detail:", e);
     } finally {
@@ -282,10 +289,10 @@ export const ChannelDetailPage: React.FC = () => {
   }, [highlightId, messages]);
 
   const fetchLiveReport = async () => {
-    if (!channelId) return;
+    if (!channel) return;
     setLiveReportLoading(true);
     try {
-      const res = await getLiveReport(channelId);
+      const res = await getLiveReport(channel.id);
       setLiveReportMd(res.report);
     } catch (e) {
       console.error("Error fetching live report:", e);
@@ -298,7 +305,7 @@ export const ChannelDetailPage: React.FC = () => {
     if (activeTab === 'live-report') {
       fetchLiveReport();
     }
-  }, [activeTab, channelId]);
+  }, [activeTab, channel]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -307,8 +314,8 @@ export const ChannelDetailPage: React.FC = () => {
         setStatus(st);
 
         // If scraping is active globally or specifically for this channel, refresh messages
-        if (st.is_scraping) {
-          const msgData = await getMessages({ channel_id: channelId });
+        if (st.is_scraping && channel) {
+          const msgData = await getMessages({ channel_id: channel.id });
           setMessages(msgData);
         }
 
@@ -329,9 +336,9 @@ export const ChannelDetailPage: React.FC = () => {
   }, [channel]);
 
   const handleScrape = async () => {
-    if (!channelId) return;
+    if (!channel) return;
     try {
-      await scrapeSingleChannel(channelId);
+      await scrapeSingleChannel(channel.id);
       setIsScrapingChannel(true);
     } catch (e) {
       console.error(e);
@@ -340,10 +347,10 @@ export const ChannelDetailPage: React.FC = () => {
 
   const handleUpdateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!channelId) return;
+    if (!channel) return;
     try {
       const updated = await scheduleChannel(
-        channelId, 
+        channel.id, 
         isAutoMonitoring, 
         intervalVal, 
         intervalUnit, 
@@ -368,10 +375,10 @@ export const ChannelDetailPage: React.FC = () => {
   };
 
   const handleGenerateAiReport = async () => {
-    if (!channelId) return;
+    if (!channel) return;
     setReportLoading(true);
     try {
-      const res = await generateAiReport(channelId, startDate, endDate);
+      const res = await generateAiReport(channel.id, startDate, endDate);
       setReportMarkdown(res.report);
       setActiveReportId(res.report_id);
       setShowReportModal(true);
@@ -851,8 +858,8 @@ export const ChannelDetailPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      if (!channelId) return;
-                      window.open(`/api/channels/${channelId}/live-report/download-pdf`, '_blank');
+                      if (!channel) return;
+                      window.open(`/api/channels/${channel.id}/live-report/download-pdf`, '_blank');
                     }}
                     className="flex items-center gap-1 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] rounded transition-colors"
                   >
