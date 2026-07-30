@@ -416,10 +416,32 @@ class TelegramScraper:
         self.is_scraping = True
         self.progress = 0
         self.logs.clear()
+
+        # --- Smart Priority Sort ---
+        # Channels with existing CSV data → incremental scrape (fast, ~1500 msgs cap) → go FIRST
+        # Channels with no CSV data       → first-time full scrape (slow, ~50k msgs)  → go LAST
+        def _scrape_priority(ch: Dict[str, Any]) -> int:
+            latest_id = self._get_latest_saved_msg_id(ch.get("id", ""))
+            return 0 if latest_id > 0 else 1  # 0 = incremental/fast, 1 = first-time/slow
+
+        original_order = [ch.get("title", ch.get("id", "?")) for ch in channels]
+        channels = sorted(channels, key=_scrape_priority)
+        sorted_order = [ch.get("title", ch.get("id", "?")) for ch in channels]
+
+        # Log reorder if it changed
+        if original_order != sorted_order:
+            fast = [n for n, ch in zip(sorted_order, channels) if _scrape_priority(ch) == 0]
+            slow = [n for n, ch in zip(sorted_order, channels) if _scrape_priority(ch) == 1]
+            if fast:
+                self.log(f"⚡ Fast (incremental) first: {', '.join(fast)}")
+            if slow:
+                self.log(f"🐢 Slow (first-time) queued last: {', '.join(slow)}")
+
         self.total_channels_count = len(channels)
-        self.scrape_queue = [ch.get("title", ch.get("id", "?")) for ch in channels]
+        self.scrape_queue = sorted_order.copy()
         self.completed_channels = []
         self.log(f"Initiating Telegram data collection across {len(channels)} channels...")
+
 
         all_scraped_messages = []
         try:
