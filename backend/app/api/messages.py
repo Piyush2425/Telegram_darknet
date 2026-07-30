@@ -76,21 +76,73 @@ async def get_message_count():
 async def global_search_messages(
     q: str = Query("", description="Keyword to search across all channel messages"),
     threat_level: Optional[str] = Query(None, description="Filter by threat level: LOW, MEDIUM, HIGH, CRITICAL"),
+    fuzzy: bool = Query(False, description="Enable fuzzy obfuscation / leetspeak matching"),
     limit: int = Query(200, description="Maximum results to return")
 ):
     """Search across ALL channel messages simultaneously for a given keyword."""
     if not q or not q.strip():
         return []
 
-    q_lower = q.strip().lower()
+    q_clean = q.strip()
     msgs = list(store.messages.values())
 
-    # Filter by keyword in text or sender
-    results = [
-        m for m in msgs
-        if q_lower in (m.get("text") or "").lower()
-        or q_lower in (m.get("sender") or "").lower()
-    ]
+    if fuzzy:
+        import re
+        char_map = {
+            'a': r'[aA4@\^]',
+            'b': r'[bB8]',
+            'c': r'[cC]',
+            'd': r'[dD]',
+            'e': r'[eE3]',
+            'f': r'[fF]',
+            'g': r'[gG69]',
+            'h': r'[hH]',
+            'i': r'[iIlL1!|]',
+            'j': r'[jJ]',
+            'k': r'[kK]',
+            'l': r'[lLiI1!|]',
+            'm': r'[mM]',
+            'n': r'[nN]',
+            'o': r'[oO0]',
+            'p': r'[pP]',
+            'q': r'[qQ]',
+            'r': r'[rR]',
+            's': r'[sS5$]',
+            't': r'[tT7+]',
+            'u': r'[uU]',
+            'v': r'[vV]',
+            'w': r'[wW]',
+            'x': r'[xX]',
+            'y': r'[yY]',
+            'z': r'[zZ2]'
+        }
+        pattern_str = ""
+        for char in q_clean.lower():
+            if char in char_map:
+                pattern_str += char_map[char]
+            else:
+                pattern_str += re.escape(char)
+        try:
+            rx = re.compile(pattern_str)
+            results = [
+                m for m in msgs
+                if rx.search(m.get("text") or "")
+                or rx.search(m.get("sender") or "")
+            ]
+        except Exception:
+            q_lower = q_clean.lower()
+            results = [
+                m for m in msgs
+                if q_lower in (m.get("text") or "").lower()
+                or q_lower in (m.get("sender") or "").lower()
+            ]
+    else:
+        q_lower = q_clean.lower()
+        results = [
+            m for m in msgs
+            if q_lower in (m.get("text") or "").lower()
+            or q_lower in (m.get("sender") or "").lower()
+        ]
 
     # Optional threat level filter
     if threat_level:
@@ -99,6 +151,7 @@ async def global_search_messages(
     # Sort newest first, limit results
     results.sort(key=lambda x: x.get("date", ""), reverse=True)
     return results[:limit]
+
 
 
 def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:

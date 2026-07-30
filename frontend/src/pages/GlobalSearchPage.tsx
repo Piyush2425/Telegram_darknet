@@ -46,6 +46,7 @@ const THREAT_LEVELS = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 export const GlobalSearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState('ALL');
+  const [isFuzzy, setIsFuzzy] = useState(false);
   const [results, setResults] = useState<Message[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,7 +69,7 @@ export const GlobalSearchPage: React.FC = () => {
     return msg.channel_id;
   }, [channels]);
 
-  const doSearch = useCallback(async (q: string, tl: string) => {
+  const doSearch = useCallback(async (q: string, tl: string, fuzz: boolean) => {
     if (!q.trim()) {
       setResults([]);
       setSearched(false);
@@ -77,7 +78,7 @@ export const GlobalSearchPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await globalSearch(q.trim(), tl === 'ALL' ? undefined : tl);
+      const data = await globalSearch(q.trim(), tl === 'ALL' ? undefined : tl, fuzz);
       setResults(data);
       setSearched(true);
     } catch (e) {
@@ -90,10 +91,10 @@ export const GlobalSearchPage: React.FC = () => {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      doSearch(query, threatFilter);
+      doSearch(query, threatFilter, isFuzzy);
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, threatFilter, doSearch]);
+  }, [query, threatFilter, isFuzzy, doSearch]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -147,24 +148,43 @@ export const GlobalSearchPage: React.FC = () => {
           )}
         </div>
 
-        {/* Threat Filter Pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-          <span className="text-xs text-slate-500 font-medium">Severity:</span>
-          {THREAT_LEVELS.map(lvl => (
-            <button
-              key={lvl}
-              id={`filter-${lvl.toLowerCase()}`}
-              onClick={() => setThreatFilter(lvl)}
-              className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
-                threatFilter === lvl
-                  ? 'bg-blue-600 text-white border-blue-600 shadow'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'
-              }`}
-            >
-              {lvl}
-            </button>
-          ))}
+        {/* Threat Filter & Fuzzy Logic Panel */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+          {/* Threat Filter Pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="text-xs text-slate-500 font-medium">Severity:</span>
+            {THREAT_LEVELS.map(lvl => (
+              <button
+                key={lvl}
+                id={`filter-${lvl.toLowerCase()}`}
+                onClick={() => setThreatFilter(lvl)}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
+                  threatFilter === lvl
+                    ? 'bg-blue-600 text-white border-blue-600 shadow'
+                    : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'
+                }`}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+
+          {/* Fuzzy Obfuscation Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isFuzzy}
+                onChange={e => setIsFuzzy(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-slate-200 hover:bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              <span className="ml-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors">
+                Fuzzy Obfuscation Search (1nt3l, g00gl3)
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 
