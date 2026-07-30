@@ -16,10 +16,8 @@
 
 *   **Offline AI Parsing Engine**: Evaluates scraped conversations to label message threat severity instantly (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
 *   **Structural Cyber Threat Extractor**: Automatically parses message details to identify and group:
-    *   **CVE Vulnerabilities**: Extracts software vulnerability references (e.g., CVE-2026-X).
-    *   **Credential Combo Leaks**: Pinpoints databases, usernames, and passwords traded by threat actors.
-    *   **SHA256 File Hashes**: Identifies threat Indicators of Compromise (IOCs) for security firewalls.
-    *   **Cryptocurrency Wallets**: Automatically extracts Bitcoin and Ethereum transaction endpoints.
+ Urls 
+ Suspiciose activities messages and compromised companies and all if there is a conversations in groups and channels 
 
 ---
 

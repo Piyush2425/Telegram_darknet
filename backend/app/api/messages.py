@@ -14,6 +14,36 @@ def _safe_name(s: str) -> str:
     s = s.strip("_")
     return s[:80] if s else "target"
 
+
+@router.get("/global-search")
+async def global_search_messages(
+    q: str = Query("", description="Keyword to search across all channel messages"),
+    threat_level: Optional[str] = Query(None, description="Filter by threat level: LOW, MEDIUM, HIGH, CRITICAL"),
+    limit: int = Query(200, description="Maximum results to return")
+):
+    """Search across ALL channel messages simultaneously for a given keyword."""
+    if not q or not q.strip():
+        return []
+
+    q_lower = q.strip().lower()
+    msgs = list(store.messages.values())
+
+    # Filter by keyword in text or sender
+    results = [
+        m for m in msgs
+        if q_lower in (m.get("text") or "").lower()
+        or q_lower in (m.get("sender") or "").lower()
+    ]
+
+    # Optional threat level filter
+    if threat_level:
+        results = [m for m in results if m.get("threat_level", "").upper() == threat_level.upper()]
+
+    # Sort newest first, limit results
+    results.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return results[:limit]
+
+
 def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
     """Load and parse messages from CSV file for the channel."""
     messages = []

@@ -89,6 +89,14 @@ export const getMessages = async (params?: { channel_id?: string; threat_level?:
   return res.data;
 };
 
+export const globalSearch = async (q: string, threatLevel?: string): Promise<Message[]> => {
+  const params: Record<string, string> = { q };
+  if (threatLevel) params.threat_level = threatLevel;
+  const res = await api.get('/messages/global-search', { params });
+  return res.data;
+};
+
+
 export const startScraping = async (): Promise<{ status: string }> => {
   const res = await api.post('/scraper/start');
   return res.data;

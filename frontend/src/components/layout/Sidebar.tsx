@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Cpu, ShieldAlert, Key, Globe } from 'lucide-react';
+import { LayoutDashboard, Settings, Cpu, ShieldAlert, Key, Globe, Search } from 'lucide-react';
 
 const navItems = [
   { path: '/', label: 'Overview Dashboard', icon: LayoutDashboard },
+  { path: '/search', label: 'Global Search', icon: Search },
   { path: '/settings', label: 'Settings & Telethon', icon: Settings },
 ];
 

@@ -5,6 +5,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ChannelDetailPage } from './pages/ChannelDetailPage';
+import { GlobalSearchPage } from './pages/GlobalSearchPage';
 import { getScraperStatus } from './services/api';
 
 export function App() {
@@ -42,6 +43,7 @@ export function App() {
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/search" element={<GlobalSearchPage />} />
                   </Routes>
                 </main>
               </div>
