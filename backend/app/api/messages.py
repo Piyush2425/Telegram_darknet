@@ -48,31 +48,35 @@ def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
     """Load and parse messages from CSV file for the channel."""
     messages = []
     try:
-        safe_name = _safe_name(channel_title)
-        csv_path = settings.BASE_DIR / "data" / "chats" / f"messages_{safe_name}.csv"
-        if csv_path.exists():
-            with open(csv_path, "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-                if len(rows) > 1:
-                    # Skip header row
-                    for r in rows[1:]:
-                        if len(r) >= 6:
-                            messages.append({
-                                "id": r[0],
-                                "channel_id": channel_id,
-                                "channel_username": channel_title,
-                                "sender": r[2],
-                                "text": r[3],
-                                "date": r[1],
-                                "views": int(r[4]) if r[4].isdigit() else 10,
-                                "media_url": None,
-                                "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
-                                "analyzed": True
-                            })
+        # Actual storage path: data/{channel_id}/chats/messages_{YYYY-MM-DD}.csv
+        chats_dir = settings.DATA_DIR / channel_id / "chats"
+        if chats_dir.exists():
+            for csv_path in sorted(chats_dir.glob("messages_*.csv")):
+                try:
+                    with open(csv_path, "r", encoding="utf-8") as f:
+                        reader = csv.reader(f)
+                        rows = list(reader)
+                    if len(rows) > 1:
+                        for r in rows[1:]:
+                            if len(r) >= 6:
+                                messages.append({
+                                    "id": r[0],
+                                    "channel_id": channel_id,
+                                    "channel_username": channel_title,
+                                    "sender": r[2],
+                                    "text": r[3],
+                                    "date": r[1],
+                                    "views": int(r[4]) if r[4].isdigit() else 10,
+                                    "media_url": None,
+                                    "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
+                                    "analyzed": True
+                                })
+                except Exception:
+                    pass
     except Exception as e:
         pass
     return messages
+
 
 @router.get("", response_model=List[Message])
 async def get_messages(

@@ -20,50 +20,54 @@ logger = logging.getLogger("darknet_monitor")
 
 
 def _restore_all_csv_messages():
-    """Scan all data/chats/messages_*.csv files and bulk-load messages into store.messages on startup."""
-    chats_dir = settings.DATA_DIR / "chats"
-    if not chats_dir.exists():
+    """Scan all data/{channel_id}/chats/messages_*.csv files and bulk-load into store.messages on startup."""
+    data_dir = settings.DATA_DIR
+    if not data_dir.exists():
         return
     loaded = 0
-    for csv_path in chats_dir.glob("messages_*.csv"):
-        try:
-            # Derive a synthetic channel_id from the filename
-            stem = csv_path.stem  # e.g. "messages_SomeName"
-            channel_title = stem[len("messages_"):].replace("_", " ").strip()
-            # Try to find matching channel in store
-            matched_channel_id = None
-            for ch_id, ch in store.channels.items():
-                safe = re.sub(r"\W+", "_", (ch.get("title") or "").strip()).strip("_")[:80]
-                if safe == stem[len("messages_"):]:
-                    matched_channel_id = ch_id
-                    channel_title = ch.get("title", channel_title)
-                    break
-            ch_id_to_use = matched_channel_id or f"csv_{stem}"
+    # Walk every subdirectory of data/ — each is a channel_id folder
+    for channel_dir in data_dir.iterdir():
+        if not channel_dir.is_dir():
+            continue
+        chats_dir = channel_dir / "chats"
+        if not chats_dir.exists():
+            continue
 
-            with open(csv_path, "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-            if len(rows) <= 1:
-                continue
-            for r in rows[1:]:
-                if len(r) >= 6:
-                    msg_id = r[0]
-                    if msg_id not in store.messages:
-                        store.messages[msg_id] = {
-                            "id": msg_id,
-                            "channel_id": ch_id_to_use,
-                            "channel_username": channel_title,
-                            "sender": r[2],
-                            "text": r[3],
-                            "date": r[1],
-                            "views": int(r[4]) if r[4].isdigit() else 10,
-                            "media_url": None,
-                            "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
-                            "analyzed": True
-                        }
-                        loaded += 1
-        except Exception as e:
-            logger.warning(f"CSV restore failed for {csv_path.name}: {e}")
+        # The subdirectory name IS the channel_id (e.g. "-1001619134470")
+        ch_id_on_disk = channel_dir.name
+
+        # Try to find a matching channel in store by id
+        ch_in_store = store.channels.get(ch_id_on_disk)
+        channel_title = ch_in_store.get("title", ch_id_on_disk) if ch_in_store else ch_id_on_disk
+
+        # Load every date-wise CSV for this channel
+        for csv_path in sorted(chats_dir.glob("messages_*.csv")):
+            try:
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+                if len(rows) <= 1:
+                    continue
+                for r in rows[1:]:
+                    if len(r) >= 6:
+                        msg_id = r[0]
+                        if msg_id not in store.messages:
+                            store.messages[msg_id] = {
+                                "id": msg_id,
+                                "channel_id": ch_id_on_disk,
+                                "channel_username": channel_title,
+                                "sender": r[2],
+                                "text": r[3],
+                                "date": r[1],
+                                "views": int(r[4]) if r[4].isdigit() else 10,
+                                "media_url": None,
+                                "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
+                                "analyzed": True
+                            }
+                            loaded += 1
+            except Exception as e:
+                logger.warning(f"CSV restore failed for {csv_path}: {e}")
+
     if loaded:
         logger.info(f"✓ Restored {loaded} messages from local CSV files into memory store.")
 
