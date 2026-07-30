@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Shield, Radio, RefreshCw, Eye, MessageSquare, Terminal, PlayCircle, Bug, Globe, AlertTriangle, Clock, Check, ArrowLeft, Calendar, RotateCcw, Cpu, Copy, X, FileText } from 'lucide-react';
 import { getChannels, getMessages, scrapeSingleChannel, getScraperStatus, scheduleChannel, generateAiReport, getLiveReport } from '../services/api';
 import { Channel, Message, ScraperStatus } from '../types';
@@ -194,6 +194,8 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
 export const ChannelDetailPage: React.FC = () => {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
   const [channel, setChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
@@ -267,6 +269,17 @@ export const ChannelDetailPage: React.FC = () => {
   useEffect(() => {
     fetchChannelData();
   }, [channelId]);
+
+  useEffect(() => {
+    if (highlightId && messages.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`msg-row-${highlightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 800);
+    }
+  }, [highlightId, messages]);
 
   const fetchLiveReport = async () => {
     if (!channelId) return;
@@ -864,8 +877,16 @@ export const ChannelDetailPage: React.FC = () => {
                   </thead>
 
                   <tbody className="divide-y divide-darkBorder/40 text-[11px] text-slate-600">
-                    {filteredMessages.map((msg) => (
-                      <tr key={msg.id} className="hover:bg-slate-50 transition-colors">
+                    {filteredMessages.map((msg) => {
+                      const isHighlighted = highlightId === msg.id;
+                      return (
+                        <tr
+                          key={msg.id}
+                          id={`msg-row-${msg.id}`}
+                          className={`hover:bg-slate-50 transition-all ${
+                            isHighlighted ? 'bg-amber-100/80 border-l-4 border-l-amber-500 font-medium' : 'hover:bg-slate-50'
+                          }`}
+                        >
                         <td className="py-3 px-4 font-mono text-cyan-600 font-bold break-all">
                           {msg.sender}
                         </td>
@@ -885,7 +906,8 @@ export const ChannelDetailPage: React.FC = () => {
                           {msg.views}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
 
                     {filteredMessages.length === 0 && (
                       <tr>

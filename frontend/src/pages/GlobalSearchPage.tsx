@@ -206,30 +206,23 @@ export const GlobalSearchPage: React.FC = () => {
       {!loading && searched && results.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm text-left">
               <thead>
-                <tr className="bg-slate-100 border-b border-slate-200">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide w-40">Channel</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide w-36">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide w-28">Sender</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide w-24">Severity</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Message</th>
-                  <th className="px-4 py-3 w-10"></th>
+                <tr className="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  <th className="px-4 py-3 w-36">Date</th>
+                  <th className="px-4 py-3 w-32">Sender</th>
+                  <th className="px-4 py-3 w-44">Channel Name</th>
+                  <th className="px-4 py-3">Message</th>
+                  <th className="px-4 py-3 w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {results.map((msg, idx) => (
                   <tr
                     key={msg.id || idx}
-                    className="hover:bg-slate-50 transition-colors group"
+                    onClick={() => window.open(`/channel/${msg.channel_id}?highlight=${msg.id}`, '_blank')}
+                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
                   >
-                    {/* Channel */}
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800 truncate max-w-[140px]" title={getChannelName(msg)}>
-                        {getChannelName(msg)}
-                      </div>
-                    </td>
-
                     {/* Date */}
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                       {formatDate(msg.date)}
@@ -237,28 +230,33 @@ export const GlobalSearchPage: React.FC = () => {
 
                     {/* Sender */}
                     <td className="px-4 py-3">
-                      <span className="text-slate-700 font-medium text-xs truncate block max-w-[100px]" title={msg.sender}>
+                      <span className="text-slate-700 font-medium text-xs truncate block max-w-[120px]" title={msg.sender}>
                         {msg.sender || 'Anonymous'}
                       </span>
                     </td>
 
-                    {/* Threat */}
+                    {/* Channel Name */}
                     <td className="px-4 py-3">
-                      <ThreatBadge level={msg.threat_level} />
+                      <div className="font-semibold text-slate-800 truncate max-w-[160px]" title={getChannelName(msg)}>
+                        {getChannelName(msg)}
+                      </div>
                     </td>
 
                     {/* Message text with highlight */}
-                    <td className="px-4 py-3 max-w-[440px]">
+                    <td className="px-4 py-3 max-w-[500px]">
                       <p className="text-slate-700 text-xs leading-relaxed line-clamp-3 break-words">
                         {highlightText(msg.text || '(no text)', query)}
                       </p>
                     </td>
 
-                    {/* Open channel */}
-                    <td className="px-4 py-3">
+                    {/* Open channel link */}
+                    <td className="px-4 py-3 text-center">
                       <button
-                        title="Open channel detail"
-                        onClick={() => window.open(`/channel/${msg.channel_id}`, '_blank')}
+                        title="Open channel and highlight message"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/channel/${msg.channel_id}?highlight=${msg.id}`, '_blank');
+                        }}
                         className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600"
                       >
                         <ExternalLink className="w-4 h-4" />
