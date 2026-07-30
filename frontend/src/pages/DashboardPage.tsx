@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Shield, Radio, RefreshCw, Eye, Trash2, ArrowRight, CheckSquare, Square, Terminal, PlayCircle, MessageSquare, Briefcase, FileText, Search, MoreVertical } from 'lucide-react';
-import { getChannels, getMessages, toggleChannelMonitoring, startScraping, getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels } from '../services/api';
+import { getChannels, getMessages, toggleChannelMonitoring, startScraping, getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels, getMessageCount } from '../services/api';
 import { Channel, Message, ScraperStatus } from '../types';
 
 export const DashboardPage: React.FC = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [msgCount, setMsgCount] = useState<{ total: number; total_on_disk: number; per_channel_on_disk: Record<string, number> }>({ total: 0, total_on_disk: 0, per_channel_on_disk: {} });
   const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -17,12 +18,14 @@ export const DashboardPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [chData, msgData] = await Promise.all([
+      const [chData, msgData, countData] = await Promise.all([
         getChannels(),
-        getMessages()
+        getMessages(),
+        getMessageCount(),
       ]);
       setChannels(chData);
       setMessages(msgData);
+      setMsgCount(countData);
     } catch (e) {
       console.error("Dashboard fetch error:", e);
     } finally {
@@ -178,12 +181,18 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2 */}
+        {/* Card 2 — Total Messages */}
         <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard">
           <div className="space-y-1">
             <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total Messages</div>
-            <div className="text-2xl font-bold text-slate-800">{messages.length}</div>
-            <div className="text-[10px] text-slate-400 font-medium">Messages Scraped</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {msgCount.total_on_disk > 0 ? msgCount.total_on_disk.toLocaleString() : messages.length.toLocaleString()}
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium">
+              {msgCount.total_on_disk > 0
+                ? `${msgCount.total.toLocaleString()} across ${Object.keys(msgCount.per_channel_on_disk).length} channels`
+                : 'Messages Scraped'}
+            </div>
           </div>
           <div className="w-11 h-11 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center border border-blue-500/20">
             <MessageSquare className="w-5 h-5" />

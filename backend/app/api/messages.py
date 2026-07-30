@@ -15,6 +15,50 @@ def _safe_name(s: str) -> str:
     return s[:80] if s else "target"
 
 
+@router.get("/count")
+async def get_message_count():
+    """Return total message count and per-channel breakdown — lightweight, no full message payloads."""
+    from collections import Counter
+    counts = Counter(m.get("channel_id", "unknown") for m in store.messages.values())
+    total = sum(counts.values())
+
+    # Also scan CSV directories for channels not yet loaded in memory
+    csv_total = 0
+    channel_csv_counts: dict = {}
+    try:
+        data_dir = settings.DATA_DIR
+        if data_dir.exists():
+            for channel_dir in data_dir.iterdir():
+                if not channel_dir.is_dir():
+                    continue
+                chats_dir = channel_dir / "chats"
+                if not chats_dir.exists():
+                    continue
+                ch_id = channel_dir.name
+                ch_count = 0
+                for csv_path in chats_dir.glob("messages_*.csv"):
+                    try:
+                        with open(csv_path, "r", encoding="utf-8") as f:
+                            # Subtract 1 for header row
+                            ch_count += max(0, sum(1 for _ in f) - 1)
+                    except Exception:
+                        pass
+                if ch_count > 0:
+                    channel_csv_counts[ch_id] = ch_count
+                    csv_total += ch_count
+    except Exception:
+        pass
+
+    return {
+        "total_in_memory": total,
+        "total_on_disk": csv_total,
+        # Use disk count as the authoritative total (superset of memory)
+        "total": max(total, csv_total),
+        "per_channel_in_memory": dict(counts),
+        "per_channel_on_disk": channel_csv_counts,
+    }
+
+
 @router.get("/global-search")
 async def global_search_messages(
     q: str = Query("", description="Keyword to search across all channel messages"),

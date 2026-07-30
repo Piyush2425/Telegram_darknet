@@ -96,6 +96,10 @@ export const globalSearch = async (q: string, threatLevel?: string): Promise<Mes
   return res.data;
 };
 
+export const getMessageCount = async (): Promise<{ total: number; total_on_disk: number; per_channel_on_disk: Record<string, number> }> => {
+  const res = await api.get('/messages/count');
+  return res.data;
+};
 
 export const startScraping = async (): Promise<{ status: string }> => {
   const res = await api.post('/scraper/start');
