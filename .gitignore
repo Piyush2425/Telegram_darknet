@@ -40,7 +40,7 @@ data
 *.sqlite3
 *.session
 *.session-journal
-
+darknet_session.session
 # IDE & OS
 .vscode/
 .idea/
