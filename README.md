@@ -106,6 +106,8 @@ Create a `.env` configuration file:
 cp .env.example .env
 nano .env
 ```
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=darknet_monitor
 Fill in your `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`.
 
 #### 3. Configure Frontend Client
