@@ -38,8 +38,7 @@ data
 *.db
 *.sqlite
 *.sqlite3
-*.session
-*.session-journal
+
 
 # IDE & OS
 .vscode/
