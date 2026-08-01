@@ -49,22 +49,38 @@ class InMemoryStore:
 
 store = InMemoryStore()
 
-# Try initializing Motor MongoDB Client
+# Motor client is lazily initialized; real connection is verified in lifespan via ping.
 mongo_available = False
 db_client = None
+db = None
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
-    client = AsyncIOMotorClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
-    db = client[settings.DATABASE_NAME]
-    mongo_available = True
-except Exception as e:
-    logger.warning(f"MongoDB not connected: {e}. Using in-memory database store.")
-    mongo_available = False
+    _motor_client = AsyncIOMotorClient(settings.MONGODB_URL, serverSelectionTimeoutMS=3000)
+    db = _motor_client[settings.DATABASE_NAME]
+except Exception:
+    _motor_client = None
+
+async def connect_to_mongo() -> bool:
+    """Ping MongoDB and log the result. Returns True if connected."""
+    global mongo_available
+    if _motor_client is None:
+        logger.error("❌ MongoDB driver (motor) not available. Check requirements.txt.")
+        return False
+    try:
+        await _motor_client.admin.command("ping")
+        mongo_available = True
+        logger.info(f"✅ MongoDB connected successfully → {settings.MONGODB_URL} (db: {settings.DATABASE_NAME})")
+        return True
+    except Exception as e:
+        mongo_available = False
+        logger.warning(f"⚠️  MongoDB connection failed: {e}. Running in In-Memory mode (CSV storage only).")
+        return False
 
 async def get_db_status():
     return {
         "mongo_connected": mongo_available,
         "database_name": settings.DATABASE_NAME,
-        "mode": "MongoDB" if mongo_available else "In-Memory Store"
+        "url": settings.MONGODB_URL,
+        "mode": "MongoDB" if mongo_available else "In-Memory Store (CSV)"
     }

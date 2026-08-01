@@ -12,7 +12,7 @@ from .api.messages import router as messages_router
 from .api.intelligence import router as intel_router
 from .api.reports import router as reports_router
 from .api.auth import router as auth_router
-from .db.mongodb import get_db_status, store
+from .db.mongodb import get_db_status, store, connect_to_mongo
 from .scrapers.telegram_scraper import telegram_scraper
 from .scrapers.scheduler import run_scheduler, stop_scheduler
 
@@ -129,15 +129,20 @@ def _migrate_session_file():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: if Telegram session exists and user is authorized, auto-sync all channels."""
-    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
+    """On startup: connect to MongoDB, restore CSV data, then auto-sync Telegram if session exists."""
+    logger.info(f"═══════════════════════════════════════════════")
+    logger.info(f"  {settings.PROJECT_NAME} v{settings.VERSION} — Starting Up")
+    logger.info(f"═══════════════════════════════════════════════")
     logger.info(f"TELEGRAM_API_ID = {settings.TELEGRAM_API_ID}")
     logger.info(f"TELEGRAM_API_HASH = {'*' * 6 + settings.TELEGRAM_API_HASH[-4:] if settings.TELEGRAM_API_HASH else 'NOT SET'}")
 
-    # Migrate session files to new path
+    # 1. Test MongoDB connection and log the result
+    await connect_to_mongo()
+
+    # 2. Migrate session files to persistent data path
     _migrate_session_file()
 
-    # Restore any already migrated title-based or existing ID folders
+    # 3. Restore any already migrated title-based or existing ID folders
     _restore_all_csv_messages()
 
     # Auto-sync channels if user session is already saved
