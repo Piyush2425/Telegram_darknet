@@ -69,7 +69,7 @@ class TelegramScraper:
         if not target_api_id or not target_api_hash:
             return None
 
-        session_path = str(settings.BASE_DIR / "darknet_session")
+        session_path = str(settings.DATA_DIR / "darknet_session")
         return TelegramClient(session_path, int(target_api_id), str(target_api_hash))
 
     async def get_connected_client(self) -> Optional[Any]:

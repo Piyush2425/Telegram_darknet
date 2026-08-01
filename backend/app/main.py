@@ -108,12 +108,34 @@ def _restore_all_csv_messages():
         logger.info(f"✓ Restored {loaded} messages from local CSV files into memory store.")
 
 
+def _migrate_session_file():
+    """Migrate the old darknet_session files from BASE_DIR to DATA_DIR for clean persistence."""
+    old_base = settings.BASE_DIR / "darknet_session"
+    new_base = settings.DATA_DIR / "darknet_session"
+
+    # Check for all sqlite database files created by Telethon (.session and .session-journal)
+    for ext in [".session", ".session-journal"]:
+        old_file = old_base.with_name(old_base.name + ext)
+        new_file = new_base.with_name(new_base.name + ext)
+        if old_file.exists() and not new_file.exists():
+            try:
+                settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+                import shutil
+                shutil.copy2(old_file, new_file)
+                logger.info(f"🔑 Moved Telethon session file to secure persistent storage: {old_file.name}")
+            except Exception as e:
+                logger.warning(f"Could not migrate session file {old_file.name}: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """On startup: if Telegram session exists and user is authorized, auto-sync all channels."""
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
     logger.info(f"TELEGRAM_API_ID = {settings.TELEGRAM_API_ID}")
     logger.info(f"TELEGRAM_API_HASH = {'*' * 6 + settings.TELEGRAM_API_HASH[-4:] if settings.TELEGRAM_API_HASH else 'NOT SET'}")
+
+    # Migrate session files to new path
+    _migrate_session_file()
 
     # Restore any already migrated title-based or existing ID folders
     _restore_all_csv_messages()
