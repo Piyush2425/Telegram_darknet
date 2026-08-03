@@ -91,9 +91,25 @@ class TelegramScraper:
             await self.client.connect()
             return self.client
         except Exception as e:
-            err_str = str(e)
-            if "auth_key" in err_str.lower() or "nonce" in err_str.lower() or "step 3" in err_str.lower():
+            err_str = str(e).lower()
+            # Permanent session failures — wipe the session and force re-login
+            permanent_failures = [
+                "auth_key",        # corrupted key
+                "nonce",           # nonce mismatch
+                "step 3",          # MTProto handshake failure
+                "authkeyduplicated",     # used from 2 IPs simultaneously
+                "authkeyunregistered",   # session revoked by Telegram
+                "userdeactivated",       # account banned
+                "sessionrevoked",        # manually revoked from Telegram app
+            ]
+            if any(kw in err_str for kw in permanent_failures):
+                logger.error(
+                    f"❌ Telegram session permanently invalidated: {e}\n"
+                    f"   → Delete the session file and re-authenticate via Settings page."
+                )
                 self._cleanup_corrupted_session()
+            else:
+                logger.warning(f"Telegram connection error: {e}")
             self.client = None
             return None
 
