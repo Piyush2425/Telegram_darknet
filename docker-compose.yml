@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: darknet_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: darknet_backend
+    restart: always
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      # Reads API keys from local .env automatically if it exists, 
+      # but explicit environment variables here override it.
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Mount data directory so Telegram sessions persist across restarts
+      - ./data:/app/data
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: darknet_frontend
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      # Inject custom Nginx configuration for API routing
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
