@@ -17,57 +17,38 @@ def _safe_name(s: str) -> str:
 
 @router.get("/count")
 async def get_message_count():
-    """Return total message count and per-channel breakdown — lightweight, no full message payloads."""
-    from collections import Counter
-    counts = Counter(m.get("channel_id", "unknown") for m in store.messages.values())
-    total = sum(counts.values())
+    """Return total message count and per-channel breakdown using fast MongoDB aggregations."""
+    from ..db.mongodb import db, mongo_available
+    
+    total = 0
+    per_channel = {}
+    
+    if mongo_available and db is not None:
+        try:
+            # Fast aggregation for channel counts
+            pipeline = [{"$group": {"_id": "$channel_id", "count": {"$sum": 1}}}]
+            cursor = db.messages.aggregate(pipeline)
+            async for doc in cursor:
+                ch = doc["_id"]
+                c = doc["count"]
+                per_channel[ch] = c
+                total += c
+        except Exception:
+            pass
 
-    # Also scan CSV directories for channels not yet loaded in memory
-    csv_total = 0
-    channel_csv_counts: dict = {}
-    try:
-        data_dir = settings.DATA_DIR
-        if data_dir.exists():
-            for channel_dir in data_dir.iterdir():
-                if not channel_dir.is_dir() or channel_dir.name in ["media", "reports"]:
-                    continue
-                chats_dir = channel_dir / "chats"
-                if not chats_dir.exists():
-                    continue
-                ch_id_or_title = channel_dir.name
-
-                # Try to map ch_id_or_title to a real channel_id in store.channels
-                real_channel_id = ch_id_or_title
-                for cid, ch in store.channels.items():
-                    if cid == ch_id_or_title:
-                        real_channel_id = cid
-                        break
-                    safe = re.sub(r"\W+", "_", (ch.get("title") or "").strip()).strip("_")[:80]
-                    if safe == ch_id_or_title:
-                        real_channel_id = cid
-                        break
-
-                ch_count = 0
-                for csv_path in chats_dir.glob("messages_*.csv"):
-                    try:
-                        with open(csv_path, "r", encoding="utf-8") as f:
-                            # Subtract 1 for header row
-                            ch_count += max(0, sum(1 for _ in f) - 1)
-                    except Exception:
-                        pass
-                if ch_count > 0:
-                    channel_csv_counts[real_channel_id] = ch_count
-                    csv_total += ch_count
-    except Exception:
-        pass
+    # Fallback to in-memory store if mongo fails or is offline
+    if total == 0:
+        from collections import Counter
+        counts = Counter(m.get("channel_id", "unknown") for m in store.messages.values())
+        per_channel = dict(counts)
+        total = sum(counts.values())
 
     return {
         "total_in_memory": total,
-        "total_on_disk": csv_total,
-        # Use disk count as the authoritative total (superset of memory)
-        "total": max(total, csv_total),
-        "per_channel_in_memory": dict(counts),
-        "per_channel_on_disk": channel_csv_counts,
+        "total_on_disk": total,
+        "total": total,
+        "per_channel_in_memory": per_channel,
+        "per_channel_on_disk": per_channel,
     }
 
 
@@ -79,76 +60,61 @@ async def global_search_messages(
     fuzzy: bool = Query(False, description="Enable fuzzy obfuscation / leetspeak matching"),
     limit: int = Query(200, description="Maximum results to return")
 ):
-    """Search across ALL channel messages simultaneously for a given keyword."""
+    """Search across ALL channel messages simultaneously using fast MongoDB indexing."""
     if not q or not q.strip():
         return []
 
     q_clean = q.strip()
+    from ..db.mongodb import db, mongo_available
+    
+    if mongo_available and db is not None:
+        query = {}
+        if threat_level:
+            query["threat_level"] = threat_level.upper()
+
+        if fuzzy:
+            import re
+            char_map = {
+                'a': r'[aA4@\^]', 'b': r'[bB8]', 'c': r'[cC]', 'd': r'[dD]',
+                'e': r'[eE3]', 'f': r'[fF]', 'g': r'[gG69]', 'h': r'[hH]',
+                'i': r'[iIlL1!|]', 'j': r'[jJ]', 'k': r'[kK]', 'l': r'[lLiI1!|]',
+                'm': r'[mM]', 'n': r'[nN]', 'o': r'[oO0]', 'p': r'[pP]',
+                'q': r'[qQ]', 'r': r'[rR]', 's': r'[sS5$]', 't': r'[tT7+]',
+                'u': r'[uU]', 'v': r'[vV]', 'w': r'[wW]', 'x': r'[xX]',
+                'y': r'[yY]', 'z': r'[zZ2]'
+            }
+            pattern_str = ""
+            for char in q_clean.lower():
+                if char in char_map:
+                    pattern_str += char_map[char]
+                else:
+                    pattern_str += re.escape(char)
+            # Fuzzy Regex Search
+            query["$or"] = [
+                {"text": {"$regex": pattern_str, "$options": "i"}},
+                {"sender": {"$regex": pattern_str, "$options": "i"}}
+            ]
+        else:
+            # Exact Fast Text Search
+            query["$text"] = {"$search": q_clean}
+            
+        cursor = db.messages.find(query).sort("date", -1).limit(limit)
+        results = await cursor.to_list(length=limit)
+        # Remove MongoDB _id before returning
+        for r in results:
+            r.pop("_id", None)
+        return results
+
+    # Fallback to in-memory search if MongoDB is offline
     msgs = list(store.messages.values())
-
-    if fuzzy:
-        import re
-        char_map = {
-            'a': r'[aA4@\^]',
-            'b': r'[bB8]',
-            'c': r'[cC]',
-            'd': r'[dD]',
-            'e': r'[eE3]',
-            'f': r'[fF]',
-            'g': r'[gG69]',
-            'h': r'[hH]',
-            'i': r'[iIlL1!|]',
-            'j': r'[jJ]',
-            'k': r'[kK]',
-            'l': r'[lLiI1!|]',
-            'm': r'[mM]',
-            'n': r'[nN]',
-            'o': r'[oO0]',
-            'p': r'[pP]',
-            'q': r'[qQ]',
-            'r': r'[rR]',
-            's': r'[sS5$]',
-            't': r'[tT7+]',
-            'u': r'[uU]',
-            'v': r'[vV]',
-            'w': r'[wW]',
-            'x': r'[xX]',
-            'y': r'[yY]',
-            'z': r'[zZ2]'
-        }
-        pattern_str = ""
-        for char in q_clean.lower():
-            if char in char_map:
-                pattern_str += char_map[char]
-            else:
-                pattern_str += re.escape(char)
-        try:
-            rx = re.compile(pattern_str)
-            results = [
-                m for m in msgs
-                if rx.search(m.get("text") or "")
-                or rx.search(m.get("sender") or "")
-            ]
-        except Exception:
-            q_lower = q_clean.lower()
-            results = [
-                m for m in msgs
-                if q_lower in (m.get("text") or "").lower()
-                or q_lower in (m.get("sender") or "").lower()
-            ]
-    else:
-        q_lower = q_clean.lower()
-        results = [
-            m for m in msgs
-            if q_lower in (m.get("text") or "").lower()
-            or q_lower in (m.get("sender") or "").lower()
-        ]
-
-    # Optional threat level filter
+    q_lower = q_clean.lower()
+    results = [
+        m for m in msgs
+        if q_lower in (m.get("text") or "").lower()
+        or q_lower in (m.get("sender") or "").lower()
+    ]
     if threat_level:
         results = [m for m in results if m.get("threat_level", "").upper() == threat_level.upper()]
-
-    # Sort newest first, limit results
     results.sort(key=lambda x: x.get("date", ""), reverse=True)
     return results[:limit]
 
@@ -203,7 +169,25 @@ async def get_messages(
     threat_level: Optional[str] = None,
     search: Optional[str] = None
 ):
-    """Retrieve collected messages with filtering, searching, and CSV fallback loading."""
+    """Retrieve collected messages with filtering and searching via MongoDB."""
+    from ..db.mongodb import db, mongo_available
+    
+    if mongo_available and db is not None:
+        query = {}
+        if channel_id:
+            query["channel_id"] = channel_id
+        if threat_level:
+            query["threat_level"] = threat_level.upper()
+        if search:
+            query["text"] = {"$regex": search, "$options": "i"}
+            
+        cursor = db.messages.find(query).sort("date", -1).limit(500)
+        results = await cursor.to_list(length=500)
+        for r in results:
+            r.pop("_id", None)
+        return results
+
+    # Fallback in-memory logic
     msgs = list(store.messages.values())
 
     # Check if we have messages in memory *for this specific channel*
@@ -213,10 +197,8 @@ async def get_messages(
     if channel_id and not channel_msgs_in_memory and channel_id in store.channels:
         ch = store.channels[channel_id]
         csv_msgs = _load_messages_from_csv(channel_id, ch["title"])
-        # Cache them in memory store so subsequent UI polls are instant
         for m in csv_msgs:
             store.messages[m["id"]] = m
-        # Refresh global msgs array
         msgs = list(store.messages.values())
 
     # Apply filters

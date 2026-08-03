@@ -44,12 +44,17 @@ def _migrate_numeric_folders_to_titles():
         logger.info(f"✓ Successfully migrated {migrated} channel folders to title-based naming.")
 
 
-def _restore_all_csv_messages():
-    """Scan all data/{channel_dir}/chats/messages_*.csv files and bulk-load into store.messages on startup."""
+async def _migrate_csv_messages_to_db():
+    """Scan all data/{channel_dir}/chats/messages_*.csv files and migrate them into MongoDB."""
+    from .db.mongodb import db, mongo_available
     data_dir = settings.DATA_DIR
     if not data_dir.exists():
         return
+        
     loaded = 0
+    migrated_to_db = 0
+    from pymongo import UpdateOne
+    
     # Walk every subdirectory of data/ — each is a channel folder
     for channel_dir in data_dir.iterdir():
         if not channel_dir.is_dir() or channel_dir.name in ["media", "reports"]:
@@ -59,7 +64,6 @@ def _restore_all_csv_messages():
             continue
 
         ch_id_on_disk = channel_dir.name
-
         # Try to find a matching channel in store by id or safe title
         matched_channel_id = None
         channel_title = ch_id_on_disk
@@ -77,6 +81,7 @@ def _restore_all_csv_messages():
         real_channel_id = matched_channel_id or ch_id_on_disk
 
         # Load every date-wise CSV for this channel
+        operations = []
         for csv_path in sorted(chats_dir.glob("messages_*.csv")):
             try:
                 with open(csv_path, "r", encoding="utf-8") as f:
@@ -87,24 +92,40 @@ def _restore_all_csv_messages():
                 for r in rows[1:]:
                     if len(r) >= 6:
                         msg_id = r[0]
-                        if msg_id not in store.messages:
-                            store.messages[msg_id] = {
-                                "id": msg_id,
-                                "channel_id": real_channel_id,
-                                "channel_username": channel_title,
-                                "sender": r[2],
-                                "text": r[3],
-                                "date": r[1],
-                                "views": int(r[4]) if r[4].isdigit() else 10,
-                                "media_url": None,
-                                "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
-                                "analyzed": True
-                            }
-                            loaded += 1
+                        doc = {
+                            "id": msg_id,
+                            "channel_id": real_channel_id,
+                            "channel_username": channel_title,
+                            "sender": r[2],
+                            "text": r[3],
+                            "date": r[1],
+                            "views": int(r[4]) if r[4].isdigit() else 10,
+                            "media_url": None,
+                            "threat_level": r[5] if r[5] in ["LOW", "MEDIUM", "HIGH", "CRITICAL"] else "LOW",
+                            "analyzed": True
+                        }
+                        # If mongo is active, add to bulk upsert operations
+                        if mongo_available and db is not None:
+                            operations.append(UpdateOne({"id": msg_id}, {"$set": doc}, upsert=True))
+                        else:
+                            # Fallback to memory
+                            if msg_id not in store.messages:
+                                store.messages[msg_id] = doc
+                                loaded += 1
             except Exception as e:
                 logger.warning(f"CSV restore failed for {csv_path}: {e}")
+                
+        if operations and mongo_available and db is not None:
+            try:
+                # Flush bulk write per channel
+                res = await db.messages.bulk_write(operations, ordered=False)
+                migrated_to_db += res.upserted_count
+            except Exception as e:
+                logger.error(f"Failed to migrate channel {channel_title} to MongoDB: {e}")
 
-    if loaded:
+    if migrated_to_db > 0:
+        logger.info(f"✓ Migrated {migrated_to_db} messages from CSV into MongoDB.")
+    elif loaded > 0:
         logger.info(f"✓ Restored {loaded} messages from local CSV files into memory store.")
 
 
@@ -143,7 +164,7 @@ async def lifespan(app: FastAPI):
     _migrate_session_file()
 
     # 3. Restore any already migrated title-based or existing ID folders
-    _restore_all_csv_messages()
+    await _migrate_csv_messages_to_db()
 
     # Auto-sync channels if user session is already saved
     try:
@@ -156,7 +177,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"✓ Auto-imported {len(channels)} real channels/groups from Telegram account.")
             # Run migration of folders and reload to map them correctly
             _migrate_numeric_folders_to_titles()
-            _restore_all_csv_messages()
+            await _migrate_csv_messages_to_db()
         else:
             logger.info(f"No active Telegram session. Please authenticate via Settings page.")
     except Exception as e:

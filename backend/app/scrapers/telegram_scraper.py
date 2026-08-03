@@ -162,8 +162,25 @@ class TelegramScraper:
             logger.error(f"Error reading latest saved message ID: {e}")
             return 0
 
-    def _write_messages_to_csv(self, channel_id: str, channel_title: str, messages: List[Dict[str, Any]]):
-        """Store scraped data in CSV date-wise under data/{channel_title}/chats/ directory."""
+    async def _save_messages(self, channel_id: str, channel_title: str, messages: List[Dict[str, Any]]):
+        """Store scraped data into MongoDB (primary) and CSV date-wise (backup)."""
+        from ..db.mongodb import db, mongo_available
+        from pymongo import UpdateOne
+        
+        # 1. MongoDB Insertion (Primary Storage)
+        if mongo_available and db is not None and messages:
+            try:
+                operations = []
+                for msg in messages:
+                    # Deduplicate by msg ID
+                    operations.append(UpdateOne({"id": msg["id"]}, {"$set": msg}, upsert=True))
+                if operations:
+                    result = await db.messages.bulk_write(operations, ordered=False)
+                    self.log(f"✅ Upserted {result.upserted_count} new messages into MongoDB for '{channel_title}'.")
+            except Exception as e:
+                logger.error(f"Error saving messages to MongoDB: {e}")
+
+        # 2. CSV Insertion (Backup Storage)
         try:
             # Determine folder using safe channel title
             base_dir = self._channel_dir(channel_id, channel_title)
@@ -570,9 +587,9 @@ class TelegramScraper:
 
                             self.log(f"✓ Extracted {len(scraped_from_channel)} new posts from '{self.current_channel}'")
                             
-                            # Store channel-wise CSV under title-based folder (de-duplicated)
+                            # Store channel-wise data into Mongo and CSV (de-duplicated)
                             if scraped_from_channel:
-                                self._write_messages_to_csv(ch_id, self.current_channel, scraped_from_channel)
+                                await self._save_messages(ch_id, self.current_channel, scraped_from_channel)
                                 store.add_notification("scrape", f"✓ Scraped {len(scraped_from_channel)} new messages from '{self.current_channel}'")
 
 

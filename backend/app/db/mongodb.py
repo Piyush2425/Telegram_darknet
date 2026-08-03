@@ -71,6 +71,7 @@ async def connect_to_mongo() -> bool:
         await _motor_client.admin.command("ping")
         mongo_available = True
         logger.info(f"✅ MongoDB connected successfully → {settings.MONGODB_URL} (db: {settings.DATABASE_NAME})")
+        await init_db_indexes()
         return True
     except Exception as e:
         mongo_available = False
@@ -84,3 +85,18 @@ async def get_db_status():
         "url": settings.MONGODB_URL,
         "mode": "MongoDB" if mongo_available else "In-Memory Store (CSV)"
     }
+
+async def init_db_indexes():
+    """Create MongoDB indexes for fast search and filtering."""
+    if not mongo_available or db is None:
+        return
+    try:
+        from pymongo import ASCENDING, DESCENDING, TEXT
+        # Messages collection indexes
+        await db.messages.create_index([("id", ASCENDING)], unique=True)
+        await db.messages.create_index([("channel_id", ASCENDING), ("date", DESCENDING)])
+        # Text index for global search
+        await db.messages.create_index([("text", TEXT)], default_language="english")
+        logger.info("✅ MongoDB indexes initialized (including $text search).")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to initialize MongoDB indexes: {e}")
