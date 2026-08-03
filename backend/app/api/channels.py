@@ -31,14 +31,13 @@ def _safe_name(s: str) -> str:
     return s[:80] if s else "target"
 
 def _get_csv_message_count(channel_id: str, channel_title: str) -> int:
-    """Read the channel's CSV files and return the count of messages."""
+    """Fallback: Read the channel's CSV files and return the count of messages."""
     try:
         chats_dir = get_channel_dir(channel_id, channel_title) / "chats"
         if not chats_dir.exists():
             chats_dir = settings.DATA_DIR / channel_id / "chats"
         if not chats_dir.exists():
             return 0
-
         count = 0
         for csv_path in chats_dir.glob("messages_*.csv"):
             with open(csv_path, "r", encoding="utf-8") as f:
@@ -52,12 +51,28 @@ def _get_csv_message_count(channel_id: str, channel_title: str) -> int:
 
 @router.get("", response_model=List[Channel])
 async def list_channels():
-    """List all available Telegram channels & groups with persisted message counts from CSV."""
+    """List all available Telegram channels & groups with incredibly fast MongoDB aggregations."""
+    from ..db.mongodb import db, mongo_available
     channels = list(store.channels.values())
+    
+    if mongo_available and db is not None:
+        try:
+            # Fast aggregation for all channel counts simultaneously
+            pipeline = [{"$group": {"_id": "$channel_id", "count": {"$sum": 1}}}]
+            cursor = db.messages.aggregate(pipeline)
+            counts = {}
+            async for doc in cursor:
+                counts[doc["_id"]] = doc["count"]
+                
+            for ch in channels:
+                ch["message_count"] = counts.get(ch["id"], 0)
+            return channels
+        except Exception as e:
+            pass # fallback to CSV if mongo fails
+            
     for ch in channels:
         ch["message_count"] = _get_csv_message_count(ch["id"], ch["title"])
     return channels
-
 
 @router.post("/sync-telegram")
 async def sync_user_telegram_channels():
