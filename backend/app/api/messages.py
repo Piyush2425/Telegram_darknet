@@ -167,7 +167,8 @@ def _load_messages_from_csv(channel_id: str, channel_title: str) -> List[dict]:
 async def get_messages(
     channel_id: Optional[str] = None,
     threat_level: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    fuzzy: bool = Query(False, description="Enable fuzzy obfuscation / leetspeak matching")
 ):
     """Retrieve collected messages with filtering and searching via MongoDB."""
     from ..db.mongodb import db, mongo_available
@@ -178,8 +179,33 @@ async def get_messages(
             query["channel_id"] = channel_id
         if threat_level:
             query["threat_level"] = threat_level.upper()
-        if search:
-            query["text"] = {"$regex": search, "$options": "i"}
+            
+        if search and search.strip():
+            q_clean = search.strip()
+            if fuzzy:
+                import re
+                char_map = {
+                    'a': r'[aA4@\^]', 'b': r'[bB8]', 'c': r'[cC]', 'd': r'[dD]',
+                    'e': r'[eE3]', 'f': r'[fF]', 'g': r'[gG69]', 'h': r'[hH]',
+                    'i': r'[iIlL1!|]', 'j': r'[jJ]', 'k': r'[kK]', 'l': r'[lLiI1!|]',
+                    'm': r'[mM]', 'n': r'[nN]', 'o': r'[oO0]', 'p': r'[pP]',
+                    'q': r'[qQ]', 'r': r'[rR]', 's': r'[sS5$]', 't': r'[tT7+]',
+                    'u': r'[uU]', 'v': r'[vV]', 'w': r'[wW]', 'x': r'[xX]',
+                    'y': r'[yY]', 'z': r'[zZ2]'
+                }
+                pattern_str = ""
+                for char in q_clean.lower():
+                    if char in char_map:
+                        pattern_str += char_map[char]
+                    else:
+                        pattern_str += re.escape(char)
+                query["$or"] = [
+                    {"text": {"$regex": pattern_str, "$options": "i"}},
+                    {"sender": {"$regex": pattern_str, "$options": "i"}}
+                ]
+            else:
+                # Use standard fast $text index search
+                query["$text"] = {"$search": q_clean}
             
         cursor = db.messages.find(query).sort("date", -1).limit(500)
         results = await cursor.to_list(length=500)
@@ -208,7 +234,10 @@ async def get_messages(
         msgs = [m for m in msgs if m["threat_level"].upper() == threat_level.upper()]
     if search:
         s_lower = search.lower()
-        msgs = [m for m in msgs if s_lower in m["text"].lower()]
+        msgs = [
+            m for m in msgs 
+            if s_lower in m["text"].lower() or s_lower in m.get("sender", "").lower()
+        ]
 
     # Sort newest first
     msgs.sort(key=lambda x: x["date"], reverse=True)

@@ -84,7 +84,7 @@ export const scrapeSingleChannel = async (channelId: string): Promise<{ status: 
 };
 
 
-export const getMessages = async (params?: { channel_id?: string; threat_level?: string; search?: string }): Promise<Message[]> => {
+export const getMessages = async (params?: { channel_id?: string; threat_level?: string; search?: string; fuzzy?: boolean }): Promise<Message[]> => {
   const res = await api.get('/messages', { params });
   return res.data;
 };
