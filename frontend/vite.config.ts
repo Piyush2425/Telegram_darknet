@@ -11,9 +11,15 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            // Silently consume connection errors (e.g. backend offline/loading)
-            // to avoid spamming the frontend terminal logs
+          proxy.on('error', (err, _req, res) => {
+            // Write a service unavailable response instead of bubbling the error
+            // to prevent Vite from outputting ugly tracebacks in the terminal log
+            if (res && typeof (res as any).writeHead === 'function') {
+              if (!(res as any).headersSent) {
+                (res as any).writeHead(502, { 'Content-Type': 'application/json' });
+              }
+              res.end(JSON.stringify({ error: 'Backend connection refused or offline' }));
+            }
           });
         },
       },
