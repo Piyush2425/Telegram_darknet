@@ -13,8 +13,8 @@ def serve():
     frontend_dir = os.path.join(root_dir, "frontend")
     
     # 1. Resolve Python path in virtual environment (checks root first, then backend)
-    venv_root_win = os.path.join(base_dir, ".venv", "Scripts", "python.exe")
-    venv_root_unix = os.path.join(base_dir, ".venv", "bin", "python")
+    venv_root_win = os.path.join(root_dir, ".venv", "Scripts", "python.exe")
+    venv_root_unix = os.path.join(root_dir, ".venv", "bin", "python")
     venv_back_win = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
     venv_back_unix = os.path.join(backend_dir, ".venv", "bin", "python")
     
