@@ -497,10 +497,18 @@ class TelegramScraper:
         self.logs.clear()
 
         # --- Smart Priority Sort ---
-        # Channels with existing CSV data → incremental scrape (fast, ~1500 msgs cap) → go FIRST
-        # Channels with no CSV data       → first-time full scrape (slow, ~50k msgs)  → go LAST
+        # Fetch latest message IDs for all channels concurrently first
+        latest_ids = {}
+        async def fetch_id(ch):
+            ch_id = ch.get("id", "")
+            latest_ids[ch_id] = await self._get_latest_saved_msg_id(ch_id)
+            
+        await asyncio.gather(*(fetch_id(ch) for ch in channels))
+
+        # Channels with existing data → incremental scrape (fast) → go FIRST
+        # Channels with no data       → first-time full scrape (slow) → go LAST
         def _scrape_priority(ch: Dict[str, Any]) -> int:
-            latest_id = self._get_latest_saved_msg_id(ch.get("id", ""))
+            latest_id = latest_ids.get(ch.get("id", ""), 0)
             return 0 if latest_id > 0 else 1  # 0 = incremental/fast, 1 = first-time/slow
 
         original_order = [ch.get("title", ch.get("id", "?")) for ch in channels]
