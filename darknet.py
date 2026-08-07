@@ -12,14 +12,20 @@ def serve():
     backend_dir = os.path.join(root_dir, "backend")
     frontend_dir = os.path.join(root_dir, "frontend")
     
-    # 1. Resolve Python path in virtual environment
-    venv_python_win = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
-    venv_python_unix = os.path.join(backend_dir, ".venv", "bin", "python")
+    # 1. Resolve Python path in virtual environment (check root first, then backend fallback)
+    venv_root_win = os.path.join(base_dir, ".venv", "Scripts", "python.exe")
+    venv_root_unix = os.path.join(base_dir, ".venv", "bin", "python")
+    venv_back_win = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
+    venv_back_unix = os.path.join(backend_dir, ".venv", "bin", "python")
     
-    if os.path.exists(venv_python_win):
-        python_cmd = venv_python_win
-    elif os.path.exists(venv_python_unix):
-        python_cmd = venv_python_unix
+    if os.path.exists(venv_root_win):
+        python_cmd = venv_root_win
+    elif os.path.exists(venv_root_unix):
+        python_cmd = venv_root_unix
+    elif os.path.exists(venv_back_win):
+        python_cmd = venv_back_win
+    elif os.path.exists(venv_back_unix):
+        python_cmd = venv_back_unix
     else:
         python_cmd = "python3" if sys.platform != "win32" else "python"
     
