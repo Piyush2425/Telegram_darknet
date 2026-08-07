@@ -226,12 +226,12 @@ export const DashboardPage: React.FC = () => {
 
       {/* Scraping Progress Tracker Panel */}
       {(status.is_scraping || (status.total_channels_count > 0 && status.completed_channels.length === status.total_channels_count && status.total_channels_count > 0)) && (
-        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-2 mb-5">
+        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-2 mb-5 md:h-[300px]">
           
           {/* Left Column: Channels Progress List */}
-          <div className="border-r border-slate-200 flex flex-col">
+          <div className="border-r border-slate-200 flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200 shrink-0">
               <div className="flex items-center gap-2">
                 {status.is_scraping ? (
                   <span className="flex items-center gap-1.5 text-blue-700 text-xs font-bold">
@@ -252,7 +252,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-1.5 bg-slate-100">
+            <div className="w-full h-1.5 bg-slate-100 shrink-0">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
                 style={{ width: `${status.progress}%` }}
@@ -260,7 +260,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {/* Channel list */}
-            <div className="px-5 py-3 space-y-1.5 max-h-60 overflow-y-auto flex-1">
+            <div className="px-5 py-3 space-y-1.5 overflow-y-auto flex-1 bg-slate-50/20">
               {/* Completed channels */}
               {status.completed_channels.map((name) => (
                 <div key={`done-${name}`} className="flex items-center gap-2.5 py-1">
@@ -308,9 +308,9 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Right Column: Scraper Logs */}
-          <div className="flex flex-col h-[280px] md:h-auto border-t md:border-t-0 md:border-l border-slate-200">
+          <div className="flex flex-col border-t md:border-t-0 md:border-l border-slate-200 h-full overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
                 <Terminal className="w-4 h-4 text-emerald-600" />
                 Live Scraper Terminal Output Logs
