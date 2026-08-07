@@ -13,8 +13,15 @@ def serve():
     frontend_dir = os.path.join(root_dir, "frontend")
     
     # 1. Resolve Python path in virtual environment
-    venv_python = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
-    python_cmd = venv_python if os.path.exists(venv_python) else "python"
+    venv_python_win = os.path.join(backend_dir, ".venv", "Scripts", "python.exe")
+    venv_python_unix = os.path.join(backend_dir, ".venv", "bin", "python")
+    
+    if os.path.exists(venv_python_win):
+        python_cmd = venv_python_win
+    elif os.path.exists(venv_python_unix):
+        python_cmd = venv_python_unix
+    else:
+        python_cmd = "python3" if sys.platform != "win32" else "python"
     
     # 2. Start backend
     print(f"⚙️  Starting FastAPI Backend using: {python_cmd}")
