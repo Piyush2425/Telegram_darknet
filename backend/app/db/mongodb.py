@@ -95,8 +95,9 @@ async def init_db_indexes():
         # Messages collection indexes
         await db.messages.create_index([("id", ASCENDING)], unique=True)
         await db.messages.create_index([("channel_id", ASCENDING), ("date", DESCENDING)])
+        await db.messages.create_index([("date", DESCENDING)])
         # Text index for global search
         await db.messages.create_index([("text", TEXT)], default_language="english")
-        logger.info("✅ MongoDB indexes initialized (including $text search).")
+        logger.info("✅ MongoDB indexes initialized (including $text and date search).")
     except Exception as e:
         logger.warning(f"⚠️ Failed to initialize MongoDB indexes: {e}")
