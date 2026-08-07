@@ -1,20 +1,4 @@
 services:
-  mongodb:
-    image: mongo:6.0
-    container_name: darknet_mongo
-    restart: always
-    # MongoDB is internal only - no need to expose port to host
-    expose:
-      - "27017"
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   backend:
     build:
       context: ./backend
@@ -24,16 +8,17 @@ services:
     expose:
       - "8000"
     environment:
-      # Override MongoDB URL to use the internal Docker service name
-      - MONGODB_URL=mongodb://mongodb:27017
+      # Connect to the Ubuntu server's local MongoDB (already has your 560k messages!)
+      # host.docker.internal resolves to the Ubuntu host machine from inside Docker
+      - MONGODB_URL=mongodb://host.docker.internal:27017
     env_file:
       - ./backend/.env
     volumes:
       # Persist Telegram session and scraped data across container restarts
       - ./data:/app/data
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      # This allows Docker containers to reach the host machine's localhost
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:
@@ -48,7 +33,3 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend
-
-volumes:
-  mongo_data:
-
