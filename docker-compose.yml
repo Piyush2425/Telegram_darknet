@@ -11,6 +11,8 @@ services:
       # Connect to the Ubuntu server's local MongoDB (already has your 560k messages!)
       # host.docker.internal resolves to the Ubuntu host machine from inside Docker
       - MONGODB_URL=mongodb://host.docker.internal:27017
+      # Tell backend where to save session files — must match the volume mount below
+      - DATA_DIR=/app/data
     env_file:
       - ./backend/.env
     volumes:

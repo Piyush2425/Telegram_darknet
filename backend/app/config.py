@@ -35,7 +35,8 @@ class Settings:
     
     # Storage Paths — BASE_DIR is the project root (darknet-monitor/)
     BASE_DIR: Path = Path(__file__).resolve().parents[2]
-    DATA_DIR: Path = BASE_DIR / "data"
+    # DATA_DIR can be overridden by environment variable (used in Docker)
+    DATA_DIR: Path = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
     REPORTS_DIR: Path = DATA_DIR / "reports"
 
 settings = Settings()
