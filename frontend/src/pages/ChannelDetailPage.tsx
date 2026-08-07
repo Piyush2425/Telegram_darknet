@@ -191,6 +191,46 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   return <div className="space-y-1.5">{elements}</div>;
 };
 
+const highlightText = (text: string, query: string, isFuzzy: boolean): React.ReactNode => {
+  if (!query || !query.trim()) return text;
+  
+  let patternStr = "";
+  if (isFuzzy) {
+    const charMap: Record<string, string> = {
+      'a': '[aA4@\\^]', 'b': '[bB8]', 'c': '[cC]', 'd': '[dD]',
+      'e': '[eE3]', 'f': '[fF]', 'g': '[gG69]', 'h': '[hH]',
+      'i': '[iIlL1!|]', 'j': '[jJ]', 'k': '[kK]', 'l': '[lLiI1!|]',
+      'm': '[mM]', 'n': '[nN]', 'o': '[oO0]', 'p': '[pP]',
+      'q': '[qQ]', 'r': '[rR]', 's': '[sS5$]', 't': '[tT7+]',
+      'u': '[uU]', 'v': '[vV]', 'w': '[wW]', 'x': '[xX]',
+      'y': '[yY]', 'z': '[zZ2]'
+    };
+    for (const char of query.trim().toLowerCase()) {
+      if (char in charMap) {
+        patternStr += charMap[char];
+      } else {
+        patternStr += char.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      }
+    }
+  } else {
+    patternStr = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  }
+
+  const splitRegex = new RegExp(`(${patternStr})`, 'gi');
+  const matchRegex = new RegExp(`^(${patternStr})$`, 'i');
+  
+  const parts = text.split(splitRegex);
+  return (
+    <>
+      {parts.map((part, index) => 
+        matchRegex.test(part) 
+          ? <mark key={index} className="bg-yellow-300 text-slate-900 rounded-sm px-0.5">{part}</mark> 
+          : part
+      )}
+    </>
+  );
+};
+
 export const ChannelDetailPage: React.FC = () => {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
@@ -243,6 +283,7 @@ export const ChannelDetailPage: React.FC = () => {
 
   const fetchChannelData = async () => {
     if (!channelId) return;
+    setLoading(true);
     try {
       const chData = await getChannels();
       const currentCh = chData.find(c => {
@@ -264,20 +305,6 @@ export const ChannelDetailPage: React.FC = () => {
         setIsAutoReport(!!currentCh.is_auto_report);
         setReportIntervalVal(currentCh.report_interval_value || 24);
         setReportIntervalUnit(currentCh.report_interval_unit || 'hours');
-
-        const msgData = await getMessages({ 
-          channel_id: currentCh.id,
-          search: searchQuery.trim() || undefined,
-          fuzzy: searchQuery.trim() ? fuzzySearch : undefined
-        });
-        setMessages(msgData);
-      } else {
-        const msgData = await getMessages({ 
-          channel_id: channelId,
-          search: searchQuery.trim() || undefined,
-          fuzzy: searchQuery.trim() ? fuzzySearch : undefined
-        });
-        setMessages(msgData);
       }
     } catch (e) {
       console.error("Error loading channel detail:", e);
@@ -286,40 +313,54 @@ export const ChannelDetailPage: React.FC = () => {
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!channelId) return;
-    setIsSearching(true);
-    try {
-      const activeId = channel ? channel.id : channelId;
-      const params: any = { channel_id: activeId };
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim();
-        params.fuzzy = fuzzySearch;
-      }
-      const msgData = await getMessages(params);
-      setMessages(msgData);
-    } catch (err) {
-      console.error("Search error:", err);
-    }
   };
 
-  const handleClearSearch = async () => {
+  const handleClearSearch = () => {
     setSearchQuery('');
     setIsSearching(false);
-    if (!channelId) return;
-    try {
-      const activeId = channel ? channel.id : channelId;
-      const msgData = await getMessages({ channel_id: activeId });
-      setMessages(msgData);
-    } catch (err) {
-      console.error("Clear search error:", err);
-    }
   };
 
   useEffect(() => {
     fetchChannelData();
   }, [channelId]);
+
+  // Debounced Instant Search Effect
+  useEffect(() => {
+    if (loading || !channelId) return;
+
+    const activeId = channel ? channel.id : channelId;
+    const queryClean = searchQuery.trim();
+
+    if (queryClean) {
+      setIsSearching(true);
+    } else {
+      setIsSearching(false);
+    }
+
+    if (!queryClean) {
+      getMessages({ channel_id: activeId })
+        .then((msgData) => setMessages(msgData))
+        .catch((err) => console.error("Error loading messages:", err));
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const msgData = await getMessages({
+          channel_id: activeId,
+          search: queryClean,
+          fuzzy: fuzzySearch
+        });
+        setMessages(msgData);
+      } catch (err) {
+        console.error("Instant search error:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, fuzzySearch, channelId, channel, loading]);
 
   useEffect(() => {
     if (highlightId && messages.length > 0) {
@@ -997,20 +1038,20 @@ export const ChannelDetailPage: React.FC = () => {
                             isHighlighted ? 'bg-amber-100/80 border-l-4 border-l-amber-500 font-medium' : 'hover:bg-slate-50'
                           }`}
                         >
-                        <td className="py-3 px-4 font-mono text-cyan-600 font-bold break-all">
-                          {msg.sender}
-                        </td>
+                          <td className="py-3 px-4 font-mono text-cyan-600 font-bold break-all">
+                            {highlightText(msg.sender, searchQuery, fuzzySearch)}
+                          </td>
 
-                        <td className="py-3 px-4 text-slate-500">
-                          {new Date(msg.date).toLocaleString()}
-                        </td>
+                          <td className="py-3 px-4 text-slate-500">
+                            {new Date(msg.date).toLocaleString()}
+                          </td>
 
-                        <td className="py-3 px-4 space-y-1">
-                          <div className="text-slate-700 font-mono whitespace-pre-wrap bg-slate-100 p-2 rounded border border-slate-200 break-words select-all max-h-36 overflow-y-auto leading-relaxed">
-                            {msg.text}
-                          </div>
-                          {renderMessageTags(msg.text)}
-                        </td>
+                          <td className="py-3 px-4 space-y-1">
+                            <div className="text-slate-700 font-mono whitespace-pre-wrap bg-slate-100 p-2 rounded border border-slate-200 break-words select-all max-h-36 overflow-y-auto leading-relaxed">
+                              {highlightText(msg.text, searchQuery, fuzzySearch)}
+                            </div>
+                            {renderMessageTags(msg.text)}
+                          </td>
 
                         <td className="py-3 px-4 text-center text-slate-500 font-medium">
                           {msg.views}

@@ -20,13 +20,43 @@ function ThreatBadge({ level }: { level: string }) {
   );
 }
 
-function highlightText(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
-  return parts.map((part, i) =>
-    part.toLowerCase() === query.toLowerCase()
-      ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-0.5 font-semibold">{part}</mark>
-      : part
+function highlightText(text: string, query: string, isFuzzy: boolean): React.ReactNode {
+  if (!query || !query.trim()) return text;
+  
+  let patternStr = "";
+  if (isFuzzy) {
+    const charMap: Record<string, string> = {
+      'a': '[aA4@\\^]', 'b': '[bB8]', 'c': '[cC]', 'd': '[dD]',
+      'e': '[eE3]', 'f': '[fF]', 'g': '[gG69]', 'h': '[hH]',
+      'i': '[iIlL1!|]', 'j': '[jJ]', 'k': '[kK]', 'l': '[lLiI1!|]',
+      'm': '[mM]', 'n': '[nN]', 'o': '[oO0]', 'p': '[pP]',
+      'q': '[qQ]', 'r': '[rR]', 's': '[sS5$]', 't': '[tT7+]',
+      'u': '[uU]', 'v': '[vV]', 'w': '[wW]', 'x': '[xX]',
+      'y': '[yY]', 'z': '[zZ2]'
+    };
+    for (const char of query.trim().toLowerCase()) {
+      if (char in charMap) {
+        patternStr += charMap[char];
+      } else {
+        patternStr += char.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      }
+    }
+  } else {
+    patternStr = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  }
+
+  const splitRegex = new RegExp(`(${patternStr})`, 'gi');
+  const matchRegex = new RegExp(`^(${patternStr})$`, 'i');
+  
+  const parts = text.split(splitRegex);
+  return (
+    <>
+      {parts.map((part, index) => 
+        matchRegex.test(part) 
+          ? <mark key={index} className="bg-yellow-300 text-slate-900 rounded-sm px-0.5">{part}</mark> 
+          : part
+      )}
+    </>
   );
 }
 
@@ -251,7 +281,7 @@ export const GlobalSearchPage: React.FC = () => {
                     {/* Sender */}
                     <td className="px-4 py-3">
                       <span className="text-slate-700 font-medium text-xs truncate block max-w-[120px]" title={msg.sender}>
-                        {msg.sender || 'Anonymous'}
+                        {highlightText(msg.sender || 'Anonymous', query, isFuzzy)}
                       </span>
                     </td>
 
@@ -265,7 +295,7 @@ export const GlobalSearchPage: React.FC = () => {
                     {/* Message text with highlight */}
                     <td className="px-4 py-3 max-w-[500px]">
                       <p className="text-slate-700 text-xs leading-relaxed line-clamp-3 break-words">
-                        {highlightText(msg.text || '(no text)', query)}
+                        {highlightText(msg.text || '(no text)', query, isFuzzy)}
                       </p>
                     </td>
 
