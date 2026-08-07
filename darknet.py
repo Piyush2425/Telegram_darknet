@@ -30,6 +30,31 @@ def serve():
         cwd=backend_dir
     )
     
+    # Wait for backend to bind to port 8000 before starting frontend
+    import socket
+    import time
+    print("⏳ Waiting for FastAPI Backend to boot up...")
+    timeout = 30
+    start_time = time.time()
+    backend_ready = False
+    
+    while time.time() - start_time < timeout:
+        # Check if backend process died early
+        if backend_proc.poll() is not None:
+            print("❌ Backend failed to start.")
+            break
+        try:
+            with socket.create_connection(("127.0.0.1", 8000), timeout=1):
+                backend_ready = True
+                break
+        except OSError:
+            time.sleep(0.5)
+            
+    if backend_ready:
+        print("✅ Backend is online!")
+    else:
+        print("⚠ Backend startup timed out, starting frontend anyway...")
+
     # 3. Start frontend
     print("⚡ Starting Vite Frontend...")
     frontend_proc = subprocess.Popen(
