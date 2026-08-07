@@ -55,18 +55,31 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const eventSource = new EventSource('/api/scraper/stream');
+    let wasScraping = false;
+
+    eventSource.onmessage = (event) => {
       try {
-        const st = await getScraperStatus();
+        const st = JSON.parse(event.data);
         setStatus(st);
         
-        // Auto-refresh messages and channels in real-time
-        await fetchData();
-      } catch (e) {
-        console.error(e);
+        // If scraping just finished, refresh metrics once
+        if (wasScraping && !st.is_scraping) {
+          fetchData();
+        }
+        wasScraping = st.is_scraping;
+      } catch (err) {
+        console.error("SSE parse error:", err);
       }
-    }, 1500);
-    return () => clearInterval(interval);
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn("SSE connection interrupted, EventSource will automatically reconnect.", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
   const handleSyncAccount = async () => {

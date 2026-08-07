@@ -58,14 +58,18 @@ async def global_search_messages(
     q: str = Query("", description="Keyword to search across all channel messages"),
     threat_level: Optional[str] = Query(None, description="Filter by threat level: LOW, MEDIUM, HIGH, CRITICAL"),
     fuzzy: bool = Query(False, description="Enable fuzzy obfuscation / leetspeak matching"),
-    limit: int = Query(200, description="Maximum results to return")
+    page: int = Query(1, description="Page number to fetch"),
+    limit: int = Query(50, description="Maximum results per page")
 ):
     """Search across ALL channel messages simultaneously using fast MongoDB indexing."""
     if not q or not q.strip():
-        return []
+        return {"results": [], "has_more": False}
 
     q_clean = q.strip()
     from ..db.mongodb import db, mongo_available
+    
+    skip = (page - 1) * limit
+    fetch_limit = limit + 1
     
     if mongo_available and db is not None:
         query = {}
@@ -98,12 +102,18 @@ async def global_search_messages(
             # Exact Fast Text Search
             query["$text"] = {"$search": q_clean}
             
-        cursor = db.messages.find(query).sort("date", -1).limit(limit)
-        results = await cursor.to_list(length=limit)
+        cursor = db.messages.find(query).sort("date", -1).skip(skip).limit(fetch_limit)
+        results = await cursor.to_list(length=fetch_limit)
+        
         # Remove MongoDB _id before returning
         for r in results:
             r.pop("_id", None)
-        return results
+            
+        has_more = len(results) > limit
+        if has_more:
+            results = results[:limit]
+            
+        return {"results": results, "has_more": has_more}
 
     # Fallback to in-memory search if MongoDB is offline
     msgs = list(store.messages.values())
@@ -116,7 +126,13 @@ async def global_search_messages(
     if threat_level:
         results = [m for m in results if m.get("threat_level", "").upper() == threat_level.upper()]
     results.sort(key=lambda x: x.get("date", ""), reverse=True)
-    return results[:limit]
+    
+    page_results = results[skip : skip + fetch_limit]
+    has_more = len(page_results) > limit
+    if has_more:
+        page_results = page_results[:limit]
+        
+    return {"results": page_results, "has_more": has_more}
 
 
 

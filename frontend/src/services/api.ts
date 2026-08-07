@@ -123,8 +123,14 @@ export const getMessages = async (params?: { channel_id?: string; threat_level?:
   return res.data;
 };
 
-export const globalSearch = async (q: string, threatLevel?: string, fuzzy?: boolean): Promise<Message[]> => {
-  const params: Record<string, any> = { q };
+export const globalSearch = async (
+  q: string, 
+  threatLevel?: string, 
+  fuzzy?: boolean,
+  page: number = 1,
+  limit: number = 50
+): Promise<{ results: Message[]; has_more: boolean }> => {
+  const params: Record<string, any> = { q, page, limit };
   if (threatLevel) params.threat_level = threatLevel;
   if (fuzzy) params.fuzzy = true;
   const res = await api.get('/messages/global-search', { params });

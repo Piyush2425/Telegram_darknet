@@ -82,8 +82,15 @@ export const GlobalSearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
+  
+  // Pagination & Infinite Scroll States
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getChannels().then(setChannels).catch(console.error);
@@ -92,7 +99,6 @@ export const GlobalSearchPage: React.FC = () => {
   const getChannelName = useCallback((msg: Message) => {
     const matched = channels.find(c => c.id === msg.channel_id);
     if (matched) return matched.title;
-    // Fallback: strip leading dash or number-only usernames if they look like IDs
     if (msg.channel_username && !msg.channel_username.startsWith('-') && !/^\d+$/.test(msg.channel_username)) {
       return msg.channel_username;
     }
@@ -103,13 +109,17 @@ export const GlobalSearchPage: React.FC = () => {
     if (!q.trim()) {
       setResults([]);
       setSearched(false);
+      setPage(1);
+      setHasMore(false);
       return;
     }
     setLoading(true);
     setError('');
+    setPage(1);
     try {
-      const data = await globalSearch(q.trim(), tl === 'ALL' ? undefined : tl, fuzz);
-      setResults(data);
+      const data = await globalSearch(q.trim(), tl === 'ALL' ? undefined : tl, fuzz, 1, 50);
+      setResults(data.results);
+      setHasMore(data.has_more);
       setSearched(true);
     } catch (e) {
       setError('Search failed. Please ensure the backend is running.');
@@ -117,6 +127,40 @@ export const GlobalSearchPage: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  const loadNextPage = useCallback(async () => {
+    if (!query.trim() || !hasMore || loadingMore || loading) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const data = await globalSearch(query.trim(), threatFilter === 'ALL' ? undefined : threatFilter, isFuzzy, nextPage, 50);
+      setResults(prev => [...prev, ...data.results]);
+      setHasMore(data.has_more);
+      setPage(nextPage);
+    } catch (e) {
+      console.error("Failed to load more results:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [query, threatFilter, isFuzzy, page, hasMore, loading, loadingMore]);
+
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadNextPage]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -132,6 +176,8 @@ export const GlobalSearchPage: React.FC = () => {
     setQuery('');
     setResults([]);
     setSearched(false);
+    setPage(1);
+    setHasMore(false);
     inputRef.current?.focus();
   };
 
@@ -330,6 +376,20 @@ export const GlobalSearchPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+          
+          {/* Scroll Target for Infinite Scroll */}
+          <div ref={observerTarget} className="py-6 flex justify-center border-t border-slate-100 bg-slate-50/30">
+            {loadingMore ? (
+              <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                <span>Loading more results...</span>
+              </div>
+            ) : hasMore ? (
+              <span className="text-slate-400 text-xs font-medium animate-pulse">Scroll down to load more</span>
+            ) : (
+              <span className="text-slate-400 text-xs font-medium">All results loaded</span>
+            )}
           </div>
         </div>
       )}

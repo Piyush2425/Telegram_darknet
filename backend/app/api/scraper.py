@@ -1,5 +1,7 @@
 import asyncio
+import json
 from fastapi import APIRouter, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from ..db.mongodb import store
 from ..scrapers.telegram_scraper import telegram_scraper
 from ..llm.threat_analyzer import analyzer
@@ -51,6 +53,28 @@ async def get_scraping_status():
         "completed_channels": telegram_scraper.completed_channels,
         "total_channels_count": telegram_scraper.total_channels_count,
     }
+
+@router.get("/stream")
+async def stream_scraper_status():
+    """Stream real-time scraper progress and logs using Server-Sent Events (SSE)."""
+    async def event_generator():
+        last_status = None
+        while True:
+            # Capture snapshot of state
+            current_status = {
+                "is_scraping": telegram_scraper.is_scraping,
+                "progress": telegram_scraper.progress,
+                "current_channel": telegram_scraper.current_channel,
+                "logs": list(telegram_scraper.logs),
+                "scrape_queue": list(telegram_scraper.scrape_queue),
+                "completed_channels": list(telegram_scraper.completed_channels),
+                "total_channels_count": telegram_scraper.total_channels_count,
+            }
+            if current_status != last_status:
+                last_status = current_status
+                yield f"data: {json.dumps(current_status)}\n\n"
+            await asyncio.sleep(0.8)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.post("/stop")
 async def stop_scraping():

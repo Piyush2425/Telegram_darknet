@@ -136,8 +136,27 @@ class TelegramScraper:
             return settings.DATA_DIR / self._safe_name(title)
         return settings.DATA_DIR / channel_id
 
-    def _get_latest_saved_msg_id(self, channel_id: str, channel_title: str = "") -> int:
-        """Parse all channel CSV files and return the maximum raw Telethon message ID stored."""
+    async def _get_latest_saved_msg_id(self, channel_id: str, channel_title: str = "") -> int:
+        """Parse all channel CSV files or query MongoDB to return the maximum raw Telethon message ID stored."""
+        from ..db.mongodb import db, mongo_available
+        if mongo_available and db is not None:
+            try:
+                cursor = db.messages.find({"channel_id": channel_id}, {"id": 1}).sort("date", -1).limit(20)
+                max_id = 0
+                async for doc in cursor:
+                    msg_id_str = doc.get("id", "")
+                    parts = msg_id_str.split("_")
+                    if len(parts) >= 3:
+                        try:
+                            raw_id = int(parts[-1])
+                            if raw_id > max_id:
+                                max_id = raw_id
+                        except ValueError:
+                            pass
+                if max_id > 0:
+                    return max_id
+            except Exception as e:
+                logger.error(f"Error querying latest message ID from MongoDB: {e}")
         try:
             # Try title-based folder first, then fallback to old numeric ID folder
             chats_dir = self._channel_dir(channel_id, channel_title) / "chats"
@@ -533,7 +552,7 @@ class TelegramScraper:
                     store.channels[ch_id]["status"] = "scraping"
 
                     # Check for incremental scraping stage (try title-based folder first)
-                    latest_raw_id = self._get_latest_saved_msg_id(ch_id, self.current_channel)
+                    latest_raw_id = await self._get_latest_saved_msg_id(ch_id, self.current_channel)
                     
                     if latest_raw_id > 0:
                         self.log(f"🔄 Incremental scrape active for '{self.current_channel}'. Only fetching posts newer than message ID {latest_raw_id}...")
