@@ -74,8 +74,10 @@ async def list_channels():
         except Exception as e:
             pass # fallback to CSV if mongo fails
             
-    for ch in channels:
-        ch["message_count"] = _get_csv_message_count(ch["id"], ch["title"])
+    async def get_count(ch):
+        ch["message_count"] = await asyncio.to_thread(_get_csv_message_count, ch["id"], ch["title"])
+    
+    await asyncio.gather(*(get_count(ch) for ch in channels))
     return channels
 
 @router.post("/sync-telegram")
@@ -267,37 +269,58 @@ async def generate_channel_ai_report(channel_id: str, req: AIReportRequest):
         raise HTTPException(status_code=404, detail="Channel not found")
         
     ch = store.channels[channel_id]
+    from ..db.mongodb import db, mongo_available
     
-    # 1. Fetch channel messages from CSV or memory fallback
-    from .messages import _load_messages_from_csv
-    msgs = list(store.messages.values())
-    channel_msgs = [m for m in msgs if m["channel_id"] == channel_id]
-    
-    if not channel_msgs:
-        channel_msgs = _load_messages_from_csv(channel_id, ch["title"])
-        for m in channel_msgs:
-            store.messages[m["id"]] = m
-            
-    # 2. Filter messages matching date range
     filtered = []
-    for msg in channel_msgs:
-        msg_date_str = msg.get("date", "")
+    if mongo_available and db is not None:
         try:
-            # ISO timestamp e.g. "2026-07-25T09:34:49+00:00" -> compare dates
-            msg_dt = datetime.fromisoformat(msg_date_str.replace("Z", "+00:00"))
-            
+            query = {"channel_id": channel_id}
+            date_query = {}
             if req.start_date:
-                start_dt = datetime.fromisoformat(f"{req.start_date}T00:00:00+00:00")
-                if msg_dt < start_dt:
-                    continue
+                date_query["$gte"] = f"{req.start_date}T00:00:00"
             if req.end_date:
-                end_dt = datetime.fromisoformat(f"{req.end_date}T23:59:59+00:00")
-                if msg_dt > end_dt:
-                    continue
-            filtered.append(msg)
-        except Exception:
-            filtered.append(msg)
+                date_query["$lte"] = f"{req.end_date}T23:59:59"
+            if date_query:
+                query["date"] = date_query
             
+            cursor = db.messages.find(query).sort("date", 1)
+            filtered = await cursor.to_list(length=None)
+            for r in filtered:
+                r.pop("_id", None)
+        except Exception as e:
+            logger.error(f"Error querying messages from MongoDB for AI report: {e}")
+            
+    # Fallback to CSV / In-memory if mongo is down or returned no results
+    if not filtered:
+        # 1. Fetch channel messages from CSV or memory fallback
+        from .messages import _load_messages_from_csv
+        msgs = list(store.messages.values())
+        channel_msgs = [m for m in msgs if m["channel_id"] == channel_id]
+        
+        if not channel_msgs:
+            channel_msgs = _load_messages_from_csv(channel_id, ch["title"])
+            for m in channel_msgs:
+                store.messages[m["id"]] = m
+                
+        # 2. Filter messages matching date range
+        for msg in channel_msgs:
+            msg_date_str = msg.get("date", "")
+            try:
+                # ISO timestamp e.g. "2026-07-25T09:34:49+00:00" -> compare dates
+                msg_dt = datetime.fromisoformat(msg_date_str.replace("Z", "+00:00"))
+                
+                if req.start_date:
+                    start_dt = datetime.fromisoformat(f"{req.start_date}T00:00:00+00:00")
+                    if msg_dt < start_dt:
+                        continue
+                if req.end_date:
+                    end_dt = datetime.fromisoformat(f"{req.end_date}T23:59:59+00:00")
+                    if msg_dt > end_dt:
+                        continue
+                filtered.append(msg)
+            except Exception:
+                filtered.append(msg)
+                
     if not filtered:
         raise HTTPException(
             status_code=400, 
@@ -328,8 +351,10 @@ async def generate_channel_ai_report(channel_id: str, req: AIReportRequest):
     md_path = channel_reports_dir / f"AI_Report_{channel_id}_{timestamp_str}.md"
     
     # Save files
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(report_md)
+    def save_md():
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(report_md)
+    await asyncio.to_thread(save_md)
         
     await asyncio.to_thread(
         create_detailed_pdf_report,

@@ -475,7 +475,12 @@ async def scrape_channel_silent(channel_id: str):
 
         if messages:
             # 1. Standard telemetry report
-            rep_meta = report_generator.generate_report(messages, threat_intels, [ch.get("username", ch.get("title"))])
+            rep_meta = await asyncio.to_thread(
+                report_generator.generate_report, 
+                messages, 
+                threat_intels, 
+                [ch.get("username", ch.get("title"))]
+            )
             store.reports[rep_meta["id"]] = rep_meta
             telegram_scraper.log(f"✓ Auto-scrape finished for '{ch['title']}'. Collected {len(messages)} messages.")
     except Exception as e:
