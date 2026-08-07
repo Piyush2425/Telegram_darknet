@@ -176,8 +176,8 @@ async def lifespan(app: FastAPI):
     # 2. Migrate session files to persistent data path
     _migrate_session_file()
 
-    # 3. Restore any already migrated title-based or existing ID folders
-    await _migrate_csv_messages_to_db()
+    # 3. Restore any already migrated title-based or existing ID folders in the background
+    asyncio.create_task(_migrate_csv_messages_to_db())
 
     # Auto-sync channels if user session is already saved
     try:
@@ -190,7 +190,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"✓ Auto-imported {len(channels)} real channels/groups from Telegram account.")
             # Run migration of folders and reload to map them correctly
             _migrate_numeric_folders_to_titles()
-            await _migrate_csv_messages_to_db()
+            asyncio.create_task(_migrate_csv_messages_to_db())
         else:
             logger.info(f"No active Telegram session. Please authenticate via Settings page.")
     except Exception as e:

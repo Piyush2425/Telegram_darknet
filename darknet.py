@@ -58,7 +58,7 @@ def serve():
     # 3. Start frontend
     print("⚡ Starting Vite Frontend...")
     frontend_proc = subprocess.Popen(
-        ["npm", "run", "dev"],
+        "npm run dev",
         cwd=frontend_dir,
         shell=True
     )
