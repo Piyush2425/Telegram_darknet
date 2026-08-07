@@ -338,22 +338,40 @@
             }
         }
 
-        // Setup clear queries
+        let debounceTimer;
+
+        function debounceSearch() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                runSearch();
+            }, 300); // 300ms debounce delay
+        }
+
+        // Setup clear queries & instant search as user types
         searchInput.addEventListener('input', () => {
             clearBtn.classList.toggle('hidden', !searchInput.value);
+            debounceSearch();
         });
 
         clearBtn.addEventListener('click', () => {
             searchInput.value = '';
             clearBtn.classList.add('hidden');
             searchInput.focus();
+            runSearch();
         });
+
+        // Trigger search on filter changes immediately
+        channelSelect.addEventListener('change', () => runSearch());
+        threatSelect.addEventListener('change', () => runSearch());
+        fuzzyCheckbox.addEventListener('change', () => runSearch());
 
         searchForm.addEventListener('submit', runSearch);
 
         // Run Init
         checkConnection();
         loadChannels();
+        // Initial search to load latest messages on startup
+        runSearch();
     </script>
 </body>
 </html>
