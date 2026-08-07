@@ -2,12 +2,15 @@ import os
 import csv
 import re
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from ..db.mongodb import store, get_channel_dir
+
+logger = logging.getLogger("darknet_monitor.api.channels")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 from ..db.models import Channel
@@ -54,6 +57,7 @@ async def list_channels():
     """List all available Telegram channels & groups with incredibly fast MongoDB aggregations."""
     from ..db.mongodb import db, mongo_available
     channels = list(store.channels.values())
+    logger.info(f"📋 list_channels API called. Current store.channels count: {len(channels)}, mongo_available: {mongo_available}")
     
     if mongo_available and db is not None:
         try:

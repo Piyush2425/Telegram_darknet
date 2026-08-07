@@ -158,7 +158,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"TELEGRAM_API_HASH = {'*' * 6 + settings.TELEGRAM_API_HASH[-4:] if settings.TELEGRAM_API_HASH else 'NOT SET'}")
 
     # 1. Test MongoDB connection and log the result
-    await connect_to_mongo()
+    connected = await connect_to_mongo()
+    if connected:
+        from .db.mongodb import db
+        try:
+            total_msgs = await db.messages.count_documents({})
+            logger.info(f"📊 MongoDB Connected! Total messages in database: {total_msgs}")
+        except Exception as e:
+            logger.error(f"❌ Connected to MongoDB but failed to count messages: {e}")
+    else:
+        logger.warning("⚠️ Running in fallback In-Memory (CSV) mode due to MongoDB connection failure.")
 
     # 2. Migrate session files to persistent data path
     _migrate_session_file()
