@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { PlayCircle, Terminal, Radio, Eye, Trash2, ArrowRight, CheckSquare, Square, RefreshCw, Plus } from 'lucide-react';
-import { getChannels, toggleChannelMonitoring, startScraping, getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels } from '../services/api';
+import { PlayCircle, Square, Terminal, Radio, Eye, Trash2, ArrowRight, CheckSquare, RefreshCw, Plus } from 'lucide-react';
+import { getChannels, toggleChannelMonitoring, startScraping, stopScraping, getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels } from '../services/api';
 import { Channel, ScraperStatus } from '../types';
 
 export const ScrapingPage: React.FC = () => {
@@ -88,6 +88,14 @@ export const ScrapingPage: React.FC = () => {
     }
   };
 
+  const handleStopScrape = async () => {
+    try {
+      await stopScraping();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const monitoredList = channels.filter(c => c.is_monitored);
   const allSelected = channels.length > 0 && channels.every(c => c.is_monitored);
 
@@ -125,19 +133,43 @@ export const ScrapingPage: React.FC = () => {
             <PlayCircle className={`w-4 h-4 ${status.is_scraping ? 'animate-spin' : ''}`} />
             {status.is_scraping ? `Scraping (${status.progress}%)...` : 'Scrape Selected'}
           </button>
+
+          {status.is_scraping && (
+            <button
+              onClick={handleStopScrape}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/25"
+            >
+              <Square className="w-4 h-4" />
+              Stop Scraping
+            </button>
+          )}
         </div>
       </div>
 
       {/* Progress Bar */}
       {status.is_scraping && (
-        <div className="glass-card p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-amber-400">
-            <span>Scraping Active: {status.current_channel}</span>
+        <div className={`glass-card p-5 rounded-2xl border space-y-2 ${
+          (status as any).stop_requested
+            ? 'border-rose-500/30 bg-rose-500/5'
+            : 'border-amber-500/30 bg-amber-500/5'
+        }`}>
+          <div className={`flex items-center justify-between text-xs font-semibold ${
+            (status as any).stop_requested ? 'text-rose-400' : 'text-amber-400'
+          }`}>
+            <span>
+              {(status as any).stop_requested
+                ? `⏹ Stopping after current channel: ${status.current_channel}`
+                : `Scraping Active: ${status.current_channel}`}
+            </span>
             <span>{status.progress}% Complete</span>
           </div>
           <div className="w-full h-2.5 bg-darkBg rounded-full overflow-hidden border border-white/10">
             <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300"
+              className={`h-full transition-all duration-300 ${
+                (status as any).stop_requested
+                  ? 'bg-gradient-to-r from-rose-500 to-orange-400'
+                  : 'bg-gradient-to-r from-cyan-500 to-emerald-400'
+              }`}
               style={{ width: `${status.progress}%` }}
             />
           </div>

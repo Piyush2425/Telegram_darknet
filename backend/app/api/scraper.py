@@ -43,6 +43,7 @@ async def get_scraping_status():
     """Get real-time scraping progress and logs."""
     return {
         "is_scraping": telegram_scraper.is_scraping,
+        "stop_requested": telegram_scraper._stop_requested,
         "progress": telegram_scraper.progress,
         "current_channel": telegram_scraper.current_channel,
         "logs": telegram_scraper.logs,
@@ -50,3 +51,11 @@ async def get_scraping_status():
         "completed_channels": telegram_scraper.completed_channels,
         "total_channels_count": telegram_scraper.total_channels_count,
     }
+
+@router.post("/stop")
+async def stop_scraping():
+    """Gracefully stop any running scraping job."""
+    if not telegram_scraper.is_scraping:
+        return {"status": "No scraping job is currently running"}
+    telegram_scraper.stop()
+    return {"status": "Stop signal sent. Scraping will halt after the current channel completes."}

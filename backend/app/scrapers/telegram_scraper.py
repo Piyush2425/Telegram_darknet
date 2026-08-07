@@ -26,6 +26,7 @@ class TelegramScraper:
 
     def __init__(self):
         self.is_scraping = False
+        self._stop_requested = False
         self.progress = 0
         self.current_channel = ""
         self.logs: List[str] = []
@@ -38,6 +39,12 @@ class TelegramScraper:
         self.scrape_queue: List[str] = []      # channel titles yet to be scraped
         self.completed_channels: List[str] = [] # channel titles finished
         self.total_channels_count: int = 0
+
+    def stop(self):
+        """Request a graceful stop of the current scraping job."""
+        if self.is_scraping:
+            self._stop_requested = True
+            self.log("⏹ Stop requested — will stop after current channel finishes...")
 
     def log(self, message: str):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -466,6 +473,7 @@ class TelegramScraper:
     async def scrape_channels(self, channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Fetch REAL Telegram messages. Full scrape on first run; incremental updates thereafter."""
         self.is_scraping = True
+        self._stop_requested = False
         self.progress = 0
         self.logs.clear()
 
@@ -509,6 +517,11 @@ class TelegramScraper:
                         self.log(f"Verification of user authorization failed: {e}")
 
                 for idx, channel in enumerate(channels):
+                    # Check for stop request before processing each channel
+                    if self._stop_requested:
+                        self.log(f"⏹ Scraping stopped by user after {idx} channels.")
+                        break
+
                     ch_id = channel.get("id")
                     raw_user = channel.get("raw_username", "")
                     target_entity = raw_user if raw_user else int(ch_id) if str(ch_id).lstrip("-").isdigit() else ch_id
@@ -545,6 +558,11 @@ class TelegramScraper:
                                 kwargs["min_id"] = latest_raw_id
 
                             async for message in client.iter_messages(entity, **kwargs):
+                                # Check stop flag on every message
+                                if self._stop_requested:
+                                    self.log(f"⏹ Message collection interrupted for '{self.current_channel}'.")
+                                    break
+
                                 if not message.text:
                                     continue
 

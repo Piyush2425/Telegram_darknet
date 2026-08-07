@@ -107,6 +107,11 @@ export const startScraping = async (): Promise<{ status: string }> => {
   return res.data;
 };
 
+export const stopScraping = async (): Promise<{ status: string }> => {
+  const res = await api.post('/scraper/stop');
+  return res.data;
+};
+
 export const getScraperStatus = async (): Promise<ScraperStatus> => {
   const res = await api.get('/scraper/status');
   return res.data;
