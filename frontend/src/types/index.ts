@@ -99,3 +99,10 @@ export interface IntelligenceSummary {
   threat_actors: string[];
   urls_list: string[];
 }
+
+export interface TelegramUser {
+  id: number;
+  username: string | null;
+  first_name: string | null;
+  phone: string | null;
+}

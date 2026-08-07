@@ -16,6 +16,10 @@ from .db.mongodb import get_db_status, store, connect_to_mongo
 from .scrapers.telegram_scraper import telegram_scraper
 from .scrapers.scheduler import run_scheduler, stop_scheduler
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("darknet_monitor")
 
 

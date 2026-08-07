@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Channel, Message, ThreatIntelligence, Report, ScraperStatus, IntelligenceSummary } from '../types';
+import { Channel, Message, ThreatIntelligence, Report, ScraperStatus, IntelligenceSummary, TelegramUser } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,6 +7,40 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Axios Retry Interceptor with Exponential Backoff
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const { config } = error;
+    
+    if (!config) {
+      return Promise.reject(error);
+    }
+    
+    // Initialize retry configuration
+    config.retryConfig = config.retryConfig || {
+      retryCount: 0,
+      maxRetries: 3,
+      delay: 1000,
+    };
+    
+    const isNetworkError = !error.response;
+    const isServerError = error.response && error.response.status >= 500;
+    
+    if ((isNetworkError || isServerError) && config.retryConfig.retryCount < config.retryConfig.maxRetries) {
+      config.retryConfig.retryCount += 1;
+      const backoffDelay = config.retryConfig.delay * Math.pow(2, config.retryConfig.retryCount - 1);
+      
+      console.warn(`[API Proxy] Connection failed. Retrying ${config.url} (${config.retryConfig.retryCount}/${config.retryConfig.maxRetries}) in ${backoffDelay}ms...`);
+      
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+      return api(config);
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 export const getChannels = async (): Promise<Channel[]> => {
   const res = await api.get('/channels');
@@ -128,7 +162,7 @@ export const getReports = async (): Promise<Report[]> => {
 };
 
 // Telegram Auth & OTP API
-export const getTelegramAuthStatus = async (): Promise<{ is_authorized: boolean; user?: any; reason?: string }> => {
+export const getTelegramAuthStatus = async (): Promise<{ is_authorized: boolean; user?: TelegramUser; reason?: string }> => {
   const res = await api.get('/telegram/auth/status');
   return res.data;
 };
@@ -147,7 +181,7 @@ export const verifyTelegramOtpCode = async (
   code: string, 
   phoneCodeHash?: string, 
   password?: string
-): Promise<{ status: string; user?: any; error?: string; message?: string }> => {
+): Promise<{ status: string; user?: TelegramUser; error?: string; message?: string }> => {
   const res = await api.post('/telegram/auth/verify-code', {
     phone_number: phoneNumber,
     code,
