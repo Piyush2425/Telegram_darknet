@@ -23,9 +23,15 @@ export const Navbar: React.FC<NavbarProps> = ({ isScraping }) => {
 
   useEffect(() => {
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 5000);
+    const interval = setInterval(fetchNotifs, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (dropdownOpen) {
+      fetchNotifs();
+    }
+  }, [dropdownOpen]);
 
   // Close dropdown on click outside
   useEffect(() => {

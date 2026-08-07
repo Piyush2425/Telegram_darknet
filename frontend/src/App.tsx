@@ -12,15 +12,16 @@ export function App() {
   const [isScraping, setIsScraping] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const eventSource = new EventSource('/api/scraper/stream');
+    eventSource.onmessage = (event) => {
       try {
-        const st = await getScraperStatus();
+        const st = JSON.parse(event.data);
         setIsScraping(st.is_scraping);
       } catch (e) {
         // quiet fallback
       }
-    }, 2000);
-    return () => clearInterval(interval);
+    };
+    return () => eventSource.close();
   }, []);
 
   return (
