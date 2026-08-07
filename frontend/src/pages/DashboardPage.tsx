@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Shield, Radio, RefreshCw, Eye, Trash2, ArrowRight, CheckSquare, Square, Terminal, PlayCircle, MessageSquare, Briefcase, FileText, Search, MoreVertical } from 'lucide-react';
 import { getChannels, getMessages, toggleChannelMonitoring, startScraping, getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels, getMessageCount } from '../services/api';
 import { Channel, Message, ScraperStatus } from '../types';
@@ -10,6 +10,23 @@ export const DashboardPage: React.FC = () => {
   const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+
+  const logsContainerRef = useRef<HTMLDivElement>(null);
+  const channelsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll logs to bottom
+  useEffect(() => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [status.logs]);
+
+  // Auto-scroll channels to bottom
+  useEffect(() => {
+    if (channelsContainerRef.current) {
+      channelsContainerRef.current.scrollTop = channelsContainerRef.current.scrollHeight;
+    }
+  }, [status.completed_channels, status.current_channel]);
 
   // Search, Filter & Sort states
   const [searchQuery, setSearchQuery] = useState('');
@@ -260,7 +277,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {/* Channel list */}
-            <div className="px-5 py-3 space-y-1.5 overflow-y-auto flex-1 bg-slate-50/20">
+            <div ref={channelsContainerRef} className="px-5 py-3 space-y-1.5 overflow-y-auto flex-1 bg-slate-50/20">
               {/* Completed channels */}
               {status.completed_channels.map((name) => (
                 <div key={`done-${name}`} className="flex items-center gap-2.5 py-1">
@@ -319,7 +336,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {/* Logs Body */}
-            <div className="flex-1 bg-slate-900 p-4 font-mono text-[9px] text-emerald-400 overflow-y-auto space-y-1 shadow-inner select-all leading-normal">
+            <div ref={logsContainerRef} className="flex-1 bg-slate-900 p-4 font-mono text-[9px] text-emerald-400 overflow-y-auto space-y-1 shadow-inner select-all leading-normal">
               {status.logs.map((log, idx) => (
                 <div key={idx} className="break-all whitespace-pre-wrap">
                   {log}
