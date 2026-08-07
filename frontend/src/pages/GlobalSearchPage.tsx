@@ -235,20 +235,34 @@ export const GlobalSearchPage: React.FC = () => {
 
       {/* Stats bar */}
       {!loading && searched && results.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow">
-            {results.length} result{results.length !== 1 ? 's' : ''} found
+        <div className="space-y-3">
+          {/* Quick Summary Banner */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow-md border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="text-xs opacity-75 font-semibold uppercase tracking-wider">Search Results Summary</div>
+              <div className="text-sm font-bold">
+                Found <span className="underline underline-offset-4 decoration-2 decoration-white">{results.length} matchings</span> across <span className="underline underline-offset-4 decoration-2 decoration-white">{Object.keys(channelCounts).length} channel{Object.keys(channelCounts).length !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-white/20 px-2 py-1 rounded-md font-mono">Fast MongoDB Text Indexed Search</span>
+            </div>
           </div>
-          {Object.entries(channelCounts).slice(0, 5).map(([name, count]) => (
-            <div key={name} className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
-              {name}: {count}
-            </div>
-          ))}
-          {Object.keys(channelCounts).length > 5 && (
-            <div className="text-xs text-slate-400 font-medium">
-              +{Object.keys(channelCounts).length - 5} more channels
-            </div>
-          )}
+
+          {/* Breakdown by Channels */}
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+            <span className="text-slate-500">Breakdown:</span>
+            {Object.entries(channelCounts).slice(0, 8).map(([name, count]) => (
+              <div key={name} className="bg-white border border-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm">
+                {name} <span className="ml-1 bg-slate-100 text-blue-600 px-1.5 py-0.5 rounded text-[10px]">{count}</span>
+              </div>
+            ))}
+            {Object.keys(channelCounts).length > 8 && (
+              <div className="text-[11px] text-slate-400 font-bold bg-slate-100 px-2.5 py-1.5 rounded-lg">
+                +{Object.keys(channelCounts).length - 8} more channels
+              </div>
+            )}
+          </div>
         </div>
       )}
 
