@@ -226,82 +226,111 @@ export const DashboardPage: React.FC = () => {
 
       {/* Scraping Progress Tracker Panel */}
       {(status.is_scraping || (status.total_channels_count > 0 && status.completed_channels.length === status.total_channels_count && status.total_channels_count > 0)) && (
-        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200">
-            <div className="flex items-center gap-2">
-              {status.is_scraping ? (
-                <span className="flex items-center gap-1.5 text-blue-700 text-xs font-bold">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse inline-block" />
-                  Scraping in Progress
+        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-2 mb-5">
+          
+          {/* Left Column: Channels Progress List */}
+          <div className="border-r border-slate-200 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200">
+              <div className="flex items-center gap-2">
+                {status.is_scraping ? (
+                  <span className="flex items-center gap-1.5 text-blue-700 text-xs font-bold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse inline-block" />
+                    Scraping in Progress
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                    ✓ All Channels Scraped!
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-medium">
+                  {status.completed_channels.length} / {status.total_channels_count} complete
                 </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  ✓ All Channels Scraped!
-                </span>
-              )}
-              <span className="text-xs text-slate-500 font-medium">
-                {status.completed_channels.length} / {status.total_channels_count} complete
-              </span>
+              </div>
+              <span className="text-xs font-bold text-blue-700">{status.progress}%</span>
             </div>
-            <span className="text-xs font-bold text-blue-700">{status.progress}%</span>
+
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-slate-100">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
+                style={{ width: `${status.progress}%` }}
+              />
+            </div>
+
+            {/* Channel list */}
+            <div className="px-5 py-3 space-y-1.5 max-h-60 overflow-y-auto flex-1">
+              {/* Completed channels */}
+              {status.completed_channels.map((name) => (
+                <div key={`done-${name}`} className="flex items-center gap-2.5 py-1">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500 line-through">{name}</span>
+                  <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Done</span>
+                </div>
+              ))}
+
+              {/* Currently scraping */}
+              {status.is_scraping && status.current_channel && (
+                <div className="flex items-center gap-2.5 py-1">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </span>
+                  <span className="text-xs font-bold text-blue-800">{status.current_channel}</span>
+                  <span className="ml-auto text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-pulse">Scraping...</span>
+                </div>
+              )}
+
+              {/* Queue — channels not yet started */}
+              {status.scrape_queue.map((name) => (
+                <div key={`queue-${name}`} className="flex items-center gap-2.5 py-1">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  </span>
+                  <span className="text-xs font-medium text-slate-400">{name}</span>
+                  <span className="ml-auto text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">Queued</span>
+                </div>
+              ))}
+
+              {/* All done banner */}
+              {!status.is_scraping && status.total_channels_count > 0 && status.completed_channels.length === status.total_channels_count && (
+                <div className="text-center py-2 text-xs font-bold text-emerald-700">
+                  🎉 All {status.total_channels_count} channels scraped successfully.
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="w-full h-1.5 bg-slate-100">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
-              style={{ width: `${status.progress}%` }}
-            />
+          {/* Right Column: Scraper Logs */}
+          <div className="flex flex-col h-[280px] md:h-auto border-t md:border-t-0 md:border-l border-slate-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <Terminal className="w-4 h-4 text-emerald-600" />
+                Live Scraper Terminal Output Logs
+              </div>
+              <span className={`w-2.5 h-2.5 rounded-full bg-emerald-500 ${status.is_scraping ? 'animate-pulse' : ''}`} />
+            </div>
+
+            {/* Logs Body */}
+            <div className="flex-1 bg-slate-900 p-4 font-mono text-[9px] text-emerald-400 overflow-y-auto space-y-1 shadow-inner select-all leading-normal">
+              {status.logs.map((log, idx) => (
+                <div key={idx} className="break-all whitespace-pre-wrap">
+                  {log}
+                </div>
+              ))}
+              {status.logs.length === 0 && (
+                <div className="text-slate-500 italic">Terminal log standing by...</div>
+              )}
+            </div>
           </div>
 
-          {/* Channel list */}
-          <div className="px-5 py-3 space-y-1.5 max-h-56 overflow-y-auto">
-            {/* Completed channels */}
-            {status.completed_channels.map((name) => (
-              <div key={`done-${name}`} className="flex items-center gap-2.5 py-1">
-                <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center shrink-0">
-                  <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </span>
-                <span className="text-xs font-semibold text-slate-500 line-through">{name}</span>
-                <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Done</span>
-              </div>
-            ))}
-
-            {/* Currently scraping */}
-            {status.is_scraping && status.current_channel && (
-              <div className="flex items-center gap-2.5 py-1">
-                <span className="w-5 h-5 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0">
-                  <svg className="w-3 h-3 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </span>
-                <span className="text-xs font-bold text-blue-800">{status.current_channel}</span>
-                <span className="ml-auto text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-pulse">Scraping...</span>
-              </div>
-            )}
-
-            {/* Queue — channels not yet started */}
-            {status.scrape_queue.map((name) => (
-              <div key={`queue-${name}`} className="flex items-center gap-2.5 py-1">
-                <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                </span>
-                <span className="text-xs font-medium text-slate-400">{name}</span>
-                <span className="ml-auto text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">Queued</span>
-              </div>
-            ))}
-
-            {/* All done banner */}
-            {!status.is_scraping && status.total_channels_count > 0 && status.completed_channels.length === status.total_channels_count && (
-              <div className="text-center py-2 text-xs font-bold text-emerald-700">
-                🎉 All {status.total_channels_count} channels scraped successfully.
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -427,8 +456,18 @@ export const DashboardPage: React.FC = () => {
                   </td>
 
                   {/* Last Scraped Duration */}
-                  <td className="py-4 px-4 text-center text-slate-500">
-                    {ch.status === 'scraping' ? 'Active' : '15 min ago'}
+                  <td className="py-4 px-4 text-center text-slate-500 font-mono text-[10px]">
+                    {ch.status === 'scraping' 
+                      ? <span className="text-amber-600 font-bold animate-pulse">Active</span> 
+                      : ch.last_scraped_at 
+                        ? new Date(ch.last_scraped_at).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          }) 
+                        : 'Never'}
                   </td>
 
                   {/* Status Indicator Badges matching screenshot */}
@@ -484,27 +523,7 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Terminal Output Log */}
-      <div className="glass-card p-5 rounded-xl border border-darkBorder flex flex-col h-[280px]">
-        <div className="flex items-center justify-between pb-3 border-b border-darkBorder mb-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-            <Terminal className="w-4 h-4 text-emerald-600" />
-            Live Scraper Terminal Output Log
-          </div>
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-        </div>
 
-        <div className="flex-1 bg-slate-900 rounded-lg p-4 font-mono text-[11px] text-emerald-400 overflow-y-auto space-y-1 border border-slate-800 shadow-inner">
-          {status.logs.map((log, idx) => (
-            <div key={idx} className="leading-relaxed">
-              {log}
-            </div>
-          ))}
-          {status.logs.length === 0 && (
-            <div className="text-slate-500 italic">Terminal log standing by...</div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

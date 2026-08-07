@@ -617,6 +617,7 @@ class TelegramScraper:
                         self.log(f"User account not authorized. Complete Telegram OTP verification in Settings to pull live data.")
 
                     store.channels[ch_id]["status"] = "idle"
+                    store.channels[ch_id]["last_scraped_at"] = datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
                     store.channels[ch_id]["message_count"] = len([m for m in store.messages.values() if m.get("channel_id") == str(ch_id)]) + len(scraped_from_channel)
 
                     all_scraped_messages.extend(scraped_from_channel)
