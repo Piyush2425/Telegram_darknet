@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Shield, Radio, RefreshCw, Eye, MessageSquare, Terminal, PlayCircle, Bug, Globe, AlertTriangle, Clock, Check, ArrowLeft, Calendar, RotateCcw, Cpu, Copy, X, FileText } from 'lucide-react';
-import { getChannels, getMessages, scrapeSingleChannel, getScraperStatus, scheduleChannel, generateAiReport, getLiveReport } from '../services/api';
-import { Channel, Message, ScraperStatus } from '../types';
+import { getChannels, getMessages, scrapeSingleChannel, getScraperStatus, scheduleChannel, generateAiReport, getLiveReport, getDailyMessageStats } from '../services/api';
+import { Channel, Message, ScraperStatus, DailyStatsResponse } from '../types';
 
 const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   if (!content) return <p className="text-slate-500 italic">No report content available.</p>;
@@ -246,6 +246,8 @@ export const ChannelDetailPage: React.FC = () => {
   // Date Range Filter State
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [channelDailyStats, setChannelDailyStats] = useState<DailyStatsResponse | null>(null);
+  const [selectedDateChip, setSelectedDateChip] = useState<string | null>(null);
 
   // Channel Search State
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -285,7 +287,10 @@ export const ChannelDetailPage: React.FC = () => {
     if (!channelId) return;
     setLoading(true);
     try {
-      const chData = await getChannels();
+      const [chData, dailyData] = await Promise.all([
+        getChannels(),
+        getDailyMessageStats(channelId).catch(() => null),
+      ]);
       const currentCh = chData.find(c => {
         if (c.id === channelId) return true;
         const safeTitle = c.title ? c.title.replace(/\W+/g, '_').replace(/^_+|_+$/g, '').substring(0, 80) : '';
@@ -305,6 +310,10 @@ export const ChannelDetailPage: React.FC = () => {
         setIsAutoReport(!!currentCh.is_auto_report);
         setReportIntervalVal(currentCh.report_interval_value || 24);
         setReportIntervalUnit(currentCh.report_interval_unit || 'hours');
+      }
+
+      if (dailyData) {
+        setChannelDailyStats(dailyData);
       }
     } catch (e) {
       console.error("Error loading channel detail:", e);
@@ -960,6 +969,61 @@ export const ChannelDetailPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto min-h-0 bg-darkBg/15">
               {activeTab === 'messages' ? (
                 <>
+                  {/* Daily Scraped Breakdown Chips Strip */}
+                  {channelDailyStats && channelDailyStats.daily_stats.length > 0 && (
+                    <div className="px-4 py-2.5 bg-cyan-50/40 border-b border-darkBorder flex items-center gap-2 overflow-x-auto text-xs shrink-0">
+                      <div className="flex items-center gap-1.5 text-slate-600 font-bold text-[11px] shrink-0">
+                        <Calendar className="w-3.5 h-3.5 text-cyan-600" />
+                        <span>Daily Scraped Breakdown:</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDateChip(null);
+                          setStartDate('');
+                          setEndDate('');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all ${
+                          !selectedDateChip 
+                            ? 'bg-cyan-600 text-white shadow-sm' 
+                            : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        All Dates ({messages.length})
+                      </button>
+                      {channelDailyStats.daily_stats.map((ds) => {
+                        const isSelected = selectedDateChip === ds.date;
+                        return (
+                          <button
+                            key={ds.date}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedDateChip(null);
+                                setStartDate('');
+                                setEndDate('');
+                              } else {
+                                setSelectedDateChip(ds.date);
+                                setStartDate(ds.date);
+                                setEndDate(ds.date);
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all ${
+                              isSelected 
+                                ? 'bg-cyan-600 text-white shadow-sm ring-1 ring-cyan-400' 
+                                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            <span>{ds.display_day || ds.formatted_date}</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-cyan-800 text-white' : 'bg-cyan-50 text-cyan-700 border border-cyan-200'}`}>
+                              {ds.count} msgs
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Channel search bar */}
                   <div className="bg-slate-50 border-b border-darkBorder/40 p-3 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-20">
                     <form onSubmit={handleSearch} className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Channel, Message, ThreatIntelligence, Report, ScraperStatus, IntelligenceSummary, TelegramUser } from '../types';
+import { Channel, Message, ThreatIntelligence, Report, ScraperStatus, IntelligenceSummary, TelegramUser, DailyStatsResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -118,8 +118,15 @@ export const scrapeSingleChannel = async (channelId: string): Promise<{ status: 
 };
 
 
-export const getMessages = async (params?: { channel_id?: string; threat_level?: string; search?: string; fuzzy?: boolean }): Promise<Message[]> => {
+export const getMessages = async (params?: { channel_id?: string; threat_level?: string; date?: string; search?: string; fuzzy?: boolean }): Promise<Message[]> => {
   const res = await api.get('/messages', { params });
+  return res.data;
+};
+
+export const getDailyMessageStats = async (channelId?: string, limitDays: number = 30): Promise<DailyStatsResponse> => {
+  const params: Record<string, any> = { limit_days: limitDays };
+  if (channelId) params.channel_id = channelId;
+  const res = await api.get('/messages/daily-stats', { params });
   return res.data;
 };
 

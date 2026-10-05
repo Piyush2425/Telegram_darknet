@@ -106,3 +106,38 @@ export interface TelegramUser {
   first_name: string | null;
   phone: string | null;
 }
+
+export interface DailyStatItem {
+  date: string;
+  formatted_date: string;
+  display_day: string;
+  count: number;
+  channel_count: number;
+  threat_levels: {
+    CRITICAL: number;
+    HIGH: number;
+    MEDIUM: number;
+    LOW: number;
+  };
+  top_channels: {
+    id: string;
+    title: string;
+    count: number;
+  }[];
+}
+
+export interface DailyStatsResponse {
+  today_date: string;
+  today_formatted: string;
+  today_count: number;
+  yesterday_count: number;
+  total_messages: number;
+  days_recorded: number;
+  peak_day: {
+    date: string;
+    formatted_date: string;
+    count: number;
+  } | null;
+  daily_stats: DailyStatItem[];
+}
+
