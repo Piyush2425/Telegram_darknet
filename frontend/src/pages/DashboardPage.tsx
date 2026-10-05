@@ -1,30 +1,25 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Shield, Radio, RefreshCw, Eye, Trash2, ArrowRight, CheckSquare, Square, 
   Terminal, PlayCircle, MessageSquare, Briefcase, FileText, Search, MoreVertical,
-  Calendar, TrendingUp, BarChart3, Clock, AlertTriangle, Layers, ChevronRight,
-  CheckCircle2, Sparkles, Filter, ExternalLink
+  BarChart3, Sparkles
 } from 'lucide-react';
 import { 
   getChannels, getMessages, toggleChannelMonitoring, startScraping, 
   getScraperStatus, deleteChannel, scrapeSingleChannel, syncTelegramChannels, 
-  getMessageCount, getDailyMessageStats 
+  getMessageCount 
 } from '../services/api';
-import { Channel, Message, ScraperStatus, DailyStatsResponse, DailyStatItem } from '../types';
+import { Channel, Message, ScraperStatus } from '../types';
 
 export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [msgCount, setMsgCount] = useState<{ total: number; total_on_disk: number; per_channel_on_disk: Record<string, number> }>({ total: 0, total_on_disk: 0, per_channel_on_disk: {} });
-  const [dailyStats, setDailyStats] = useState<DailyStatsResponse | null>(null);
   const [status, setStatus] = useState<ScraperStatus>({ is_scraping: false, progress: 0, current_channel: '', logs: [], scrape_queue: [], completed_channels: [], total_channels_count: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-
-  // Daily Telemetry UI state
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [dailyViewMode, setDailyViewMode] = useState<'chart' | 'table'>('chart');
-  const [dailySearchQuery, setDailySearchQuery] = useState('');
 
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const channelsContainerRef = useRef<HTMLDivElement>(null);
@@ -43,25 +38,21 @@ export const DashboardPage: React.FC = () => {
     }
   }, [status.completed_channels, status.current_channel]);
 
-  // Search, Filter & Sort states for Channels
+  // Search, Filter & Sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'GROUPS' | 'CHANNELS'>('ALL');
   const [sortBy, setSortBy] = useState<'LATEST' | 'MESSAGES' | 'NAME'>('LATEST');
 
   const fetchData = async () => {
     try {
-      const [chData, msgData, countData, dailyData] = await Promise.all([
+      const [chData, msgData, countData] = await Promise.all([
         getChannels(),
         getMessages(),
         getMessageCount(),
-        getDailyMessageStats().catch(() => null),
       ]);
       setChannels(chData);
       setMessages(msgData);
       setMsgCount(countData);
-      if (dailyData) {
-        setDailyStats(dailyData);
-      }
     } catch (e) {
       console.error("Dashboard fetch error:", e);
     } finally {
@@ -186,41 +177,32 @@ export const DashboardPage: React.FC = () => {
     return b.id.localeCompare(a.id);
   });
 
-  // Calculate max daily count for chart scaling
-  const maxDayCount = dailyStats && dailyStats.daily_stats.length > 0 
-    ? Math.max(...dailyStats.daily_stats.map(d => d.count), 1)
-    : 1;
-
-  // Filtered daily list
-  const filteredDailyStats = dailyStats?.daily_stats.filter(item => {
-    if (!dailySearchQuery) return true;
-    const q = dailySearchQuery.toLowerCase();
-    return item.formatted_date.toLowerCase().includes(q) || 
-           item.date.includes(q) ||
-           item.display_day.toLowerCase().includes(q) ||
-           item.top_channels.some(c => c.title.toLowerCase().includes(q));
-  }) || [];
-
-  const selectedDayItem = dailyStats?.daily_stats.find(d => d.date === selectedDay);
-
   return (
-    <div className="space-y-6 w-full relative">
+    <div className="space-y-5 w-full relative">
       {/* Overview Dashboard Header block */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             Overview Dashboard
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              Live CTI Telemetry
+              Live Monitoring
             </span>
           </h2>
-          <p className="text-xs text-slate-500">Real-time Telegram Channel Monitoring & Daily Threat Volume</p>
+          <p className="text-xs text-slate-500">Real-time Telegram Channel Monitoring Command Center</p>
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => navigate('/analysis')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 transition-all shadow-sm"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Daily Analysis
+          </button>
+
+          <button
             onClick={handleSyncAccount}
             disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-darkBorder hover:border-slate-400 text-slate-600 hover:text-slate-800 text-xs font-bold rounded-lg transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-darkBorder hover:border-slate-400 text-slate-600 hover:text-slate-800 text-xs font-bold rounded-lg transition-all"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
             Sync Channels
@@ -237,31 +219,31 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Row (4 premium cards with 1-day scraped volume showcase) */}
+      {/* Metrics Row (4 premium cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 — Monitored Channels */}
+        {/* Card 1 */}
         <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard shadow-sm hover:border-slate-300 transition-all">
           <div className="space-y-1">
             <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Channels Monitored</div>
             <div className="text-2xl font-bold text-slate-800">{monitoredList.length}</div>
-            <div className="text-[10px] text-slate-400 font-medium">Total Linked: {channels.length}</div>
+            <div className="text-[10px] text-slate-400 font-medium">Total Channels: {channels.length}</div>
           </div>
           <div className="w-11 h-11 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center border border-cyan-500/20 shadow-sm">
             <Radio className="w-5 h-5 animate-pulse" />
           </div>
         </div>
 
-        {/* Card 2 — Total Scraped Messages */}
+        {/* Card 2 — Total Messages */}
         <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard shadow-sm hover:border-slate-300 transition-all">
           <div className="space-y-1">
             <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total Messages</div>
             <div className="text-2xl font-bold text-slate-800">
-              {msgCount.total_on_disk > 0 ? msgCount.total_on_disk.toLocaleString() : (dailyStats?.total_messages || messages.length).toLocaleString()}
+              {msgCount.total_on_disk > 0 ? msgCount.total_on_disk.toLocaleString() : messages.length.toLocaleString()}
             </div>
             <div className="text-[10px] text-slate-400 font-medium">
               {msgCount.total_on_disk > 0
                 ? `${msgCount.total.toLocaleString()} across ${Object.keys(msgCount.per_channel_on_disk).length} channels`
-                : `${messages.length} indexed messages`}
+                : 'Messages Scraped'}
             </div>
           </div>
           <div className="w-11 h-11 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center border border-blue-500/20 shadow-sm">
@@ -269,356 +251,29 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3 — 1-Day Scraped Volume (Today's Telemetry) */}
+        {/* Card 3 — Active Scraper Jobs */}
         <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard shadow-sm hover:border-slate-300 transition-all">
           <div className="space-y-1">
-            <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <span>Today's Scraped</span>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-600">
-              {dailyStats ? dailyStats.today_count.toLocaleString() : '0'}
-            </div>
-            <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-400" />
-              <span>Yesterday: <strong className="text-slate-700">{dailyStats?.yesterday_count ?? 0}</strong></span>
-              {dailyStats && dailyStats.today_count > 0 && (
-                <span className="text-emerald-600 font-bold ml-1">
-                  (1-Day Active)
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="w-11 h-11 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center border border-emerald-500/20 shadow-sm">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Card 4 — Active Scraper Jobs / Status */}
-        <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard shadow-sm hover:border-slate-300 transition-all">
-          <div className="space-y-1">
-            <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Scraper Engine</div>
-            <div className="text-2xl font-bold text-slate-800">{status.is_scraping ? '1 Active' : 'Standby'}</div>
-            <div className="text-[10px] text-slate-400 font-medium">
-              {status.is_scraping ? `Scraping ${status.current_channel || 'channels'}...` : 'Ready to Scrape'}
-            </div>
+            <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Active Jobs</div>
+            <div className="text-2xl font-bold text-slate-800">{status.is_scraping ? '1 Active' : '0'}</div>
+            <div className="text-[10px] text-slate-400 font-medium">{status.is_scraping ? 'Scraping Live...' : 'Standby'}</div>
           </div>
           <div className="w-11 h-11 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center border border-purple-500/20 shadow-sm">
             <Briefcase className="w-5 h-5" />
           </div>
         </div>
-      </div>
 
-      {/* 📅 DAILY MESSAGES SCRAPED TELEMETRY SECTION */}
-      <div className="bg-darkCard rounded-2xl border border-darkBorder p-5 space-y-4 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-darkBorder/60 pb-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <h3 className="text-sm font-bold text-slate-800">Daily Messages Scraped Telemetry</h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-200">
-                {dailyStats?.days_recorded || 0} Recorded Days
-              </span>
-            </div>
-            <p className="text-xs text-slate-500">
-              Breakdown of scraped Telegram messages across dates (e.g., 20th Aug, 19th Aug) with threat classification
-            </p>
+        {/* Card 4 — Reports Generated */}
+        <div className="glass-card p-5 rounded-xl flex items-center justify-between border border-darkBorder bg-darkCard shadow-sm hover:border-slate-300 transition-all">
+          <div className="space-y-1">
+            <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Reports Compiled</div>
+            <div className="text-2xl font-bold text-slate-800">Ready</div>
+            <div className="text-[10px] text-slate-400 font-medium">AI Threat Briefings</div>
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="flex bg-darkBg rounded-lg p-0.5 border border-darkBorder">
-              <button
-                onClick={() => setDailyViewMode('chart')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                  dailyViewMode === 'chart' 
-                    ? 'bg-blue-600 text-white shadow-sm' 
-                    : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Visual Graph</span>
-              </button>
-              <button
-                onClick={() => setDailyViewMode('table')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                  dailyViewMode === 'table' 
-                    ? 'bg-blue-600 text-white shadow-sm' 
-                    : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Day-by-Day Log</span>
-              </button>
-            </div>
+          <div className="w-11 h-11 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center border border-emerald-500/20 shadow-sm">
+            <FileText className="w-5 h-5" />
           </div>
         </div>
-
-        {/* Highlight Peak & Today Summary Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] uppercase font-bold text-slate-500">1-Day Scraped Volume (Today)</div>
-              <div className="text-base font-bold text-slate-800">{dailyStats?.today_count ?? 0} Messages</div>
-              <div className="text-[10px] text-slate-400">{dailyStats?.today_formatted || 'Today'}</div>
-            </div>
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-              1D
-            </div>
-          </div>
-
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] uppercase font-bold text-slate-500">Peak Scraping Day</div>
-              <div className="text-base font-bold text-purple-700">
-                {dailyStats?.peak_day ? `${dailyStats.peak_day.count} Messages` : 'N/A'}
-              </div>
-              <div className="text-[10px] text-slate-400">
-                {dailyStats?.peak_day?.formatted_date || 'No history recorded'}
-              </div>
-            </div>
-            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </div>
-
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] uppercase font-bold text-slate-500">Avg Scrape per Active Day</div>
-              <div className="text-base font-bold text-emerald-700">
-                {dailyStats && dailyStats.days_recorded > 0 
-                  ? Math.round(dailyStats.total_messages / dailyStats.days_recorded)
-                  : 0} Messages / Day
-              </div>
-              <div className="text-[10px] text-slate-400">Calculated across monitored partition dates</div>
-            </div>
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-        </div>
-
-        {/* VISUAL CHART VIEW */}
-        {dailyViewMode === 'chart' && (
-          <div className="space-y-3 pt-2">
-            {filteredDailyStats.length === 0 ? (
-              <div className="py-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-500">
-                <Calendar className="w-6 h-6 text-slate-400 mx-auto mb-1.5 opacity-60" />
-                No daily scrape telemetry recorded yet. Trigger a scrape to populate date-wise metrics.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Horizontal / Bar representation of daily messages */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filteredDailyStats.map((item) => {
-                    const isSelected = selectedDay === item.date;
-                    const percent = Math.max(8, Math.round((item.count / maxDayCount) * 100));
-                    
-                    return (
-                      <div
-                        key={item.date}
-                        onClick={() => setSelectedDay(isSelected ? null : item.date)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-blue-50/50 border-blue-400 shadow-sm ring-1 ring-blue-400' 
-                            : 'bg-white hover:bg-slate-50/80 border-darkBorder'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-slate-800">{item.formatted_date}</span>
-                            {item.date === dailyStats?.today_date && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">Today</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-900">{item.count.toLocaleString()}</span>
-                            <span className="text-[10px] text-slate-400">messages</span>
-                          </div>
-                        </div>
-
-                        {/* Visual Progress Bar with Threat classification */}
-                        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-
-                        {/* Breakdown pills below bar */}
-                        <div className="flex items-center justify-between mt-2 pt-1 text-[10px]">
-                          <div className="flex items-center gap-2 text-slate-500 font-medium">
-                            <span>{item.channel_count} Channels</span>
-                            <span>•</span>
-                            <span className="font-mono text-slate-400">{item.date}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {item.threat_levels.CRITICAL > 0 && (
-                              <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 font-bold text-[9px]">
-                                {item.threat_levels.CRITICAL} Crit
-                              </span>
-                            )}
-                            {item.threat_levels.HIGH > 0 && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-700 font-bold text-[9px]">
-                                {item.threat_levels.HIGH} High
-                              </span>
-                            )}
-                            {item.threat_levels.LOW > 0 && (
-                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px]">
-                                {item.threat_levels.LOW} Low
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* DAY-BY-DAY TABLE VIEW */}
-        {dailyViewMode === 'table' && (
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative w-72">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Filter by date (e.g. 20th Aug)..."
-                  value={dailySearchQuery}
-                  onChange={(e) => setDailySearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 text-xs text-slate-800 pl-9 pr-3 py-1.5 rounded-lg border border-darkBorder focus:outline-none focus:border-blue-500 font-medium"
-                />
-              </div>
-              <span className="text-[11px] text-slate-400">
-                Showing {filteredDailyStats.length} dates
-              </span>
-            </div>
-
-            <div className="border border-darkBorder rounded-xl overflow-hidden shadow-inner bg-white">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-100/90 border-b border-darkBorder text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3 px-4">Date / Day</th>
-                    <th className="py-3 px-4 text-center">Messages Scraped</th>
-                    <th className="py-3 px-4">Threat Classification</th>
-                    <th className="py-3 px-4">Active Channels on Day</th>
-                    <th className="py-3 px-4 text-right pr-6">Partition File</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-darkBorder/60 text-slate-700">
-                  {filteredDailyStats.map((item) => (
-                    <tr key={item.date} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-800">{item.formatted_date}</div>
-                        <div className="text-[10px] font-mono text-slate-400">{item.date}</div>
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-blue-600 text-sm">
-                        {item.count.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {item.threat_levels.CRITICAL > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 border border-rose-500/20 font-bold text-[10px]">
-                              {item.threat_levels.CRITICAL} CRITICAL
-                            </span>
-                          )}
-                          {item.threat_levels.HIGH > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 font-bold text-[10px]">
-                              {item.threat_levels.HIGH} HIGH
-                            </span>
-                          )}
-                          {item.threat_levels.MEDIUM > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold text-[10px]">
-                              {item.threat_levels.MEDIUM} MED
-                            </span>
-                          )}
-                          {item.threat_levels.LOW > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[10px]">
-                              {item.threat_levels.LOW} LOW
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {item.top_channels.slice(0, 2).map(c => (
-                            <span key={c.id} className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
-                              {c.title}: <strong className="text-slate-900">{c.count}</strong>
-                            </span>
-                          ))}
-                          {item.top_channels.length > 2 && (
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              +{item.top_channels.length - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-right pr-6 font-mono text-[10px] text-slate-500">
-                        messages_{item.date}.csv
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredDailyStats.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                        No daily scrape records matching filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Selected Day Expanded Detail Card */}
-        {selectedDayItem && (
-          <div className="mt-3 p-4 bg-blue-50/60 rounded-xl border border-blue-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-blue-900">
-                  Detailed Scrape Telemetry for {selectedDayItem.formatted_date}
-                </span>
-                <span className="font-mono text-[10px] text-blue-600 bg-white px-2 py-0.5 rounded border border-blue-200">
-                  {selectedDayItem.date}
-                </span>
-              </div>
-              <button 
-                onClick={() => setSelectedDay(null)}
-                className="text-xs text-blue-600 hover:text-blue-800 font-bold"
-              >
-                Close
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-              <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                <div className="text-[10px] text-slate-500 font-medium uppercase">Messages Scraped</div>
-                <div className="text-lg font-bold text-slate-800">{selectedDayItem.count}</div>
-              </div>
-              <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                <div className="text-[10px] text-slate-500 font-medium uppercase">Active Channels</div>
-                <div className="text-lg font-bold text-slate-800">{selectedDayItem.channel_count}</div>
-              </div>
-              <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                <div className="text-[10px] text-rose-600 font-bold uppercase">Critical & High Threats</div>
-                <div className="text-lg font-bold text-rose-600">
-                  {selectedDayItem.threat_levels.CRITICAL + selectedDayItem.threat_levels.HIGH}
-                </div>
-              </div>
-              <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                <div className="text-[10px] text-slate-500 font-medium uppercase">Partition CSV</div>
-                <div className="text-[11px] font-mono font-bold text-blue-700 truncate">
-                  messages_{selectedDayItem.date}.csv
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Scraping Progress Tracker Panel */}

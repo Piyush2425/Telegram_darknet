@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DashboardPage } from './pages/DashboardPage';
+import { AnalysisPage } from './pages/AnalysisPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ChannelDetailPage } from './pages/ChannelDetailPage';
 import { GlobalSearchPage } from './pages/GlobalSearchPage';
@@ -43,6 +44,7 @@ export function App() {
                 <main className="flex-1 p-5 overflow-y-auto h-[calc(100vh-3.5rem)]">
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
+                    <Route path="/analysis" element={<AnalysisPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/search" element={<GlobalSearchPage />} />
                   </Routes>
