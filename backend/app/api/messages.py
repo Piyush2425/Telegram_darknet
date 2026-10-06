@@ -103,7 +103,7 @@ async def get_message_count():
 @router.get("/daily-stats")
 async def get_daily_message_stats(
     channel_id: Optional[str] = None,
-    limit_days: int = Query(30, description="Max days of history to return")
+    limit_days: int = Query(0, description="Max days of history to return (0 for all)")
 ):
     """
     Return daily message scraping stats, showcasing how many messages were scraped per day

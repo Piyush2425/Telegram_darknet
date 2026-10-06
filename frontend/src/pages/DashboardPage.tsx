@@ -170,11 +170,26 @@ export const DashboardPage: React.FC = () => {
     return map;
   }, [dailyStats]);
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
   // Calendar calculations
   const year = currentCalendarDate.getFullYear();
   const month = currentCalendarDate.getMonth(); // 0-indexed (0 = Jan)
+  const monthName = MONTH_NAMES[month] || currentCalendarDate.toLocaleString('default', { month: 'long' });
 
-  const monthName = currentCalendarDate.toLocaleString('default', { month: 'long' });
+  // Generate Year options (from 2020 up to current year + 5)
+  const availableYears = useMemo(() => {
+    const startYear = 2020;
+    const endYear = Math.max(new Date().getFullYear() + 5, 2030);
+    const years: number[] = [];
+    for (let y = startYear; y <= endYear; y++) {
+      years.push(y);
+    }
+    return years;
+  }, []);
 
   // First day of month (0 = Sun, 1 = Mon, ..., 6 = Sat)
   const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -187,6 +202,26 @@ export const DashboardPage: React.FC = () => {
 
   const handleNextMonth = () => {
     setCurrentCalendarDate(new Date(year, month + 1, 1));
+  };
+
+  const handleMonthSelect = (newMonth: number) => {
+    setCurrentCalendarDate(new Date(year, newMonth, 1));
+  };
+
+  const handleYearSelect = (newYear: number) => {
+    setCurrentCalendarDate(new Date(newYear, month, 1));
+  };
+
+  const handleDirectDateChange = (dateVal: string) => {
+    if (!dateVal) {
+      setSelectedCalendarDateStr(null);
+      return;
+    }
+    setSelectedCalendarDateStr(dateVal);
+    const parts = dateVal.split('-').map(Number);
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      setCurrentCalendarDate(new Date(parts[0], parts[1] - 1, 1));
+    }
   };
 
   const handleTodayMonth = () => {
@@ -209,11 +244,11 @@ export const DashboardPage: React.FC = () => {
       const suffix = (dayNum % 10 === 1 && dayNum !== 11) ? 'st' :
                      (dayNum % 10 === 2 && dayNum !== 12) ? 'nd' :
                      (dayNum % 10 === 3 && dayNum !== 13) ? 'rd' : 'th';
-      return `${dayNum}${suffix} ${dt.toLocaleString('default', { month: 'long' })} ${y}`;
+      return `${dayNum}${suffix} ${MONTH_NAMES[dt.getMonth()]} ${y}`;
     } catch {
       return selectedCalendarDateStr;
     }
-  }, [selectedCalendarDateStr]);
+  }, [selectedCalendarDateStr, MONTH_NAMES]);
 
   // Filter channels based on search and selected tab
   const filteredChannels = channels.filter(ch => {
@@ -345,32 +380,63 @@ export const DashboardPage: React.FC = () => {
           
           {/* Left Column: Interactive Month Calendar (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
-            {/* Calendar Controls (Month Navigation) */}
-            <div className="flex items-center justify-between border-b border-darkBorder/60 pb-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-800">
-                  {monthName} {year}
-                </h3>
+            {/* Calendar Controls (Month/Year Navigation & Date Jump) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-darkBorder/60 pb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                
+                {/* Month Selector */}
+                <select
+                  value={month}
+                  onChange={(e) => handleMonthSelect(Number(e.target.value))}
+                  className="bg-white border border-darkBorder text-slate-800 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer"
+                >
+                  {MONTH_NAMES.map((mName, idx) => (
+                    <option key={mName} value={idx}>{mName}</option>
+                  ))}
+                </select>
+
+                {/* Year Selector */}
+                <select
+                  value={year}
+                  onChange={(e) => handleYearSelect(Number(e.target.value))}
+                  className="bg-white border border-darkBorder text-slate-800 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer"
+                >
+                  {availableYears.map((yNum) => (
+                    <option key={yNum} value={yNum}>{yNum}</option>
+                  ))}
+                </select>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Direct Date Picker Jump */}
+                <div className="flex items-center gap-1 bg-white border border-darkBorder rounded-lg px-2 py-0.5 shadow-sm">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Go To:</span>
+                  <input
+                    type="date"
+                    value={selectedCalendarDateStr || ''}
+                    onChange={(e) => handleDirectDateChange(e.target.value)}
+                    className="text-xs text-slate-700 font-medium bg-transparent focus:outline-none cursor-pointer"
+                    title="Jump directly to any date"
+                  />
+                </div>
+
                 <button
                   onClick={handleTodayMonth}
-                  className="px-2 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-md transition-all"
+                  className="px-2 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-md transition-all shadow-sm"
                 >
                   Today
                 </button>
                 <button
                   onClick={handlePrevMonth}
-                  className="p-1 text-slate-600 hover:bg-slate-100 rounded-md transition-all border border-darkBorder"
+                  className="p-1 text-slate-600 hover:bg-slate-100 rounded-md transition-all border border-darkBorder shadow-sm"
                   title="Previous Month"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleNextMonth}
-                  className="p-1 text-slate-600 hover:bg-slate-100 rounded-md transition-all border border-darkBorder"
+                  className="p-1 text-slate-600 hover:bg-slate-100 rounded-md transition-all border border-darkBorder shadow-sm"
                   title="Next Month"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -487,46 +553,17 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Threat Levels Breakdown */}
-                {selectedDayTelemetry && selectedDayTelemetry.count > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Threat Classification</div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {selectedDayTelemetry.threat_levels.CRITICAL > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold text-[10px] border border-rose-200">
-                          {selectedDayTelemetry.threat_levels.CRITICAL} CRITICAL
+                {/* Active Channels List for this date */}
+                {selectedDayTelemetry && selectedDayTelemetry.top_channels && selectedDayTelemetry.top_channels.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Active Channels</div>
+                    <div className="flex items-center gap-1 flex-wrap max-h-[110px] overflow-y-auto">
+                      {selectedDayTelemetry.top_channels.map(c => (
+                        <span key={c.id} className="px-2 py-0.5 rounded bg-white text-slate-700 text-[10px] font-medium border border-slate-200 shadow-xs">
+                          {c.title}: <strong className="text-slate-900">{c.count}</strong>
                         </span>
-                      )}
-                      {selectedDayTelemetry.threat_levels.HIGH > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
-                          {selectedDayTelemetry.threat_levels.HIGH} HIGH
-                        </span>
-                      )}
-                      {selectedDayTelemetry.threat_levels.MEDIUM > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
-                          {selectedDayTelemetry.threat_levels.MEDIUM} MED
-                        </span>
-                      )}
-                      {selectedDayTelemetry.threat_levels.LOW > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] border border-slate-200">
-                          {selectedDayTelemetry.threat_levels.LOW} LOW
-                        </span>
-                      )}
+                      ))}
                     </div>
-
-                    {/* Active Channels List for this date */}
-                    {selectedDayTelemetry.top_channels.length > 0 && (
-                      <div className="pt-1.5">
-                        <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Active Channels</div>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {selectedDayTelemetry.top_channels.slice(0, 3).map(c => (
-                            <span key={c.id} className="px-2 py-0.5 rounded bg-white text-slate-700 text-[10px] font-medium border border-slate-200">
-                              {c.title}: <strong className="text-slate-900">{c.count}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -539,9 +576,9 @@ export const DashboardPage: React.FC = () => {
             ) : (
               <div className="flex flex-col items-center justify-center text-center py-6 space-y-2 h-full">
                 <Calendar className="w-8 h-8 text-slate-300" />
-                <div className="text-xs font-bold text-slate-600">Select Any Date on Calendar</div>
+                <div className="text-xs font-bold text-slate-600">Select or Jump to Any Date</div>
                 <p className="text-[11px] text-slate-400 max-w-[200px]">
-                  Click on any day in the calendar to view its exact scraped message count and telemetry.
+                  Click on any day in the calendar, use the month/year selectors, or enter a date in "Go To" to view its scraped message count.
                 </p>
               </div>
             )}
